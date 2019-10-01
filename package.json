@@ -1,0 +1,20 @@
+{
+  "name": "alex",
+  "version": "1.0.0",
+  "description": "A simple bot to help PluralHub",
+  "main": "bot.js",
+  "dependencies": {
+    "dblite": "^1.0.1",
+    "dotenv": "^7.0.0",
+    "eris": "^0.9.0",
+    "eris-additions": "^1.2.5",
+    "mysql": "^2.17.1",
+    "node-fetch": "^2.6.0"
+  },
+  "scripts": {
+    "start": "supervisor -e .js,.json -i data.sqlite,data.sqlite-journal bot.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
