@@ -1,6 +1,6 @@
 module.exports = {
 	help: ()=> "A bit about the bot",
-	usage: ()=> " - What it says on the tin",
+	usage: ()=> [" - What it says on the tin"],
 	execute: async (bot, msg, args) => {
 		return msg.channel.createMessage({embed: {
 			title: "About the bot",
