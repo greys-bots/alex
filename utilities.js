@@ -620,7 +620,6 @@ module.exports = {
 				fail: [],
 				info: []
 			};
-			console.log(results)
 			await Promise.all(ids.map(async id => {
 				console.log(id)
 				var user;

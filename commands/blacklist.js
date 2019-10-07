@@ -65,9 +65,13 @@ module.exports.subcommands.add = {
 		if(!cfg) cfg = {blacklist: []};
 		if(!cfg.blacklist) cfg.blacklist = [];
 
-		var ids = args.join(" ").split(/\s+/g);
+		args = args.join(" ").split(/\s+/g);
+
+		var ids = args.filter(x => !cfg.blacklist.includes(x));
+		var aa = args.filter(x => cfg.blacklist.includes(x));
 
 		var users = await bot.utils.verifyUsers(bot, ids);
+		users.fail = users.fail.concat(aa.map(u => u+" - already blacklisted"));
 
 		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "blacklist", cfg.blacklist.concat(users.pass))
 		if(!scc) return msg.channel.createMessage("Something went wrong");
@@ -80,7 +84,10 @@ module.exports.subcommands.add = {
 				{name: "Users Not Added", value: users.fail.length > 0 ? users.fail.join("\n") : "None"}
 				]
 			}})
-		} else return msg.channel.createMessage(`User${ids.length > 0 ? "s" : ""} provided are invalid`);
+		} else {
+			if(args.length == aa.length) msg.channel.createMessage(`User${ids.length > 1 ? "s" : ""} provided ${ids.length > 1 ? "are" : "is"} invalid: already added`);
+			else msg.channel.createMessage(`User${ids.length > 1 ? "s" : ""} provided ${ids.length > 1 ? "are" : "is"} invalid: not found`);
+		}
 
 	}
 }
@@ -97,6 +104,6 @@ module.exports.subcommands.remove = {
 
 		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "blacklist", cfg.blacklist.filter(x => !ids.includes(x)));
 		if(!scc) msg.channel.createMessage("Something went wrong");
-		else msg.channel.createMessage("Users removed from blacklist");
+		else msg.channel.createMessage(`User${ids.length > 1 ? "s" : ""} removed from blacklist`);
 	}
 }

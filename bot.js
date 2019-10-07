@@ -305,7 +305,7 @@ bot.on("ready",()=>{
 
 bot.on("messageCreate",async (msg)=>{
 	if(msg.author.bot) return;
-	if(!msg.guild) return msg.channel.createMessage("This bot should be used in guilds only");
+	if(!msg.guild) return msg.channel.createMessage("This bot is intended to be used in guilds only :(");
 	var prefix = new RegExp("^"+bot.prefix, "i");
 	if(!msg.content.toLowerCase().match(prefix)) return;
 	let args = msg.content.replace(prefix, "").split(" ");
