@@ -32,9 +32,9 @@ function App() {
         <h1>Notes</h1>
         <p>This website is still a work in progress - check back later for more in-depth info on the commands! We're also working on a dashboard to make server management easier</p>
         <p><strong>Prefix:</strong> Alex's prefix is ha!</p>
-        <p><strong>Permissions:</strong> The permissions that Alex needs are Manage Messages (for pruning),{" "}
-                   Manage Roles (for creating, editing, etc roles), Send Messages (obviously), Embed Links (for the color embeds),{" "}
-                   and Ban Members (speaks for itself). Giving him admin permissions may be the easiest way to go.
+        <p><strong>Permissions:</strong> The permissions that Alex needs are Manage Messages (for automatically deleting things),{" "}
+                   Manage Roles (for creating, editing, etc roles), Send Messages (obviously), Embed Links (for the post embeds),{" "}
+                   and Ban Members (speaks for itself). Giving her admin permissions may be the easiest way to go.
         </p>
         </div>
         <section className="App-footer">
@@ -42,7 +42,7 @@ function App() {
           <h1>Want to support the bot?</h1>
           <p>
             Currently, Alex is being run on a Vultr VPS along with a few other bots and the rest of our sites. At the moment this means that{" "}
-            he only has 2gb of RAM to share with everything else, and we will eventually need an upgraded{" "}
+            she only has 2gb of RAM to share with everything else, and we will eventually need an upgraded{" "}
             environment to run in. We're also without a job right now, and rely on patrons and donations to get by.<br/>
             If you'd like to donate, you can send money to our Ko-Fi or choose to become a Patron.
           </p>

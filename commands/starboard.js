@@ -1,11 +1,5 @@
 module.exports = {
-	help: "Registers channel and reaction emoji for a server pinboard.<br/>" +
-		  ["The moderator override determines if moderators can add things to the pinboard ",
-			"without needing to hit the reaction tolerance, ",
-			"'moderators' being those with the manageMessages permission.",
-			"<br/>Tolerance refers to how many reactions are needed to add a message to the board. ",
-			"By default, this number is 2. The global tolerance will be used for boards without ",
-			"their own specified tolerance."].join(""),
+	help: "Registers channel and reaction emoji for a server pinboard.",
 	usage: [" add [chanName | chanID | #channel] [:emoji:] - Add channel and reaction config",
 				" remove [chanName | chanID | #channel] - Remove channel config",
 				" view - View current configs",
@@ -50,8 +44,8 @@ module.exports.subcommands.pin = {
 }
 
 module.exports.subcommands.view = {
-	help: "Views the server's starboard config",
-	usage: [" - Views the server's starboard config."],
+	help: "Views the server's current registered starboards",
+	usage: [" - Views the server's starboards."],
 	examples: ["ha!sb view"],
 	permissions: ["manageGuild"],
 	guildOnly: true,
@@ -59,7 +53,7 @@ module.exports.subcommands.view = {
 }
 
 module.exports.subcommands.config = {
-	help: "Configure pinboard options",
+	help: "Show current pinboard configurations",
 	usage: [" - Show current configurations"],
 	examples: ["ha!cfg"],
 	permissions: ["manageGuild"],
@@ -68,7 +62,8 @@ module.exports.subcommands.config = {
 }
 
 module.exports.subcommands.tolerance = {
-	help: "Set the tolerance for boards (or globally)",
+	help: "Set the tolerance for boards (or globally). This is the number of stars "+
+	"required for a message to be added to the starboard",
 	usage: [" [number] - Set global tolerance",
 				 " - Reset global tolerance",
 				 " [channel] [number] - Set specific tolerance",
@@ -80,7 +75,9 @@ module.exports.subcommands.tolerance = {
 }
 
 module.exports.subcommands.override = {
-	help: "Sets moderator override for adding items to the pinboard",
+	help: "Sets moderator override for adding items to the pinboard. "+
+	"If this is set to true, anyone with manageMessages can automatically "+
+	"add messages to the starboard by reacting, regardless of the set tolerance.",
 	usage: [" [(true|1)|(false|0] - Sets the override. Use 1, true, or enable to enable, false, 0, or disable to disable"],
 	examples: ["ha!sb override 1", "ha!sb override true"],
 	permissions: ["manageGuild"],
