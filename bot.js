@@ -25,6 +25,27 @@ bot.customActions = [
 	{name: "rf\\(('.*')\\)", replace: "msg.guild.roles.find(r => r.name.toLowerCase() == $1.toLowerCase()).id", regex: true}
 ]
 
+bot.status = 0;
+
+const updateStatus = function(){
+	switch(bot.status){
+		case 0:
+			bot.editStatus({name: "ha!h | in "+bot.guilds.size+" guilds!"});
+			bot.status++;
+			break;
+		case 1:
+			bot.editStatus({name: "ha!h | serving "+bot.users.size+" users!"});
+			bot.status++;
+			break;
+		case 2:
+			bot.editStatus({name: "ha!h | website: alex.greysdawn.com"});
+			bot.status = 0;
+			break;
+	}
+
+	setTimeout(()=> updateStatus(),600000)
+}
+
 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
 async function setup() {
@@ -282,7 +303,7 @@ bot.commands.help = {
 			}
 		} else {
 			embed = {
-				title: `HubBot - help`,
+				title: `Alex - help`,
 				description:
 					`**Commands**\n${Object.keys(bot.commands)
 									.map(c => `**${bot.prefix + c}** - ${bot.commands[c].help()}`)
@@ -301,6 +322,7 @@ bot.commands.help = {
 
 bot.on("ready",()=>{
 	console.log("Ready");
+	updateStatus();
 })
 
 bot.on("messageCreate",async (msg)=>{
