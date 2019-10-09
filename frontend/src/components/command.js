@@ -9,8 +9,10 @@ class Command extends Component {
 	}
 
 	toggleSubcommands() {
-		if(!this.state.show) window.scrollTo(0, this.ref.current.offsetTop);
-		this.setState({show: !this.state.show});
+		if(this.state.cmd.data.subcommands) {
+			if(!this.state.show) window.scrollTo(0, this.ref.current.offsetTop);
+			this.setState({show: !this.state.show});
+		}
 	}
 
 	render() {
