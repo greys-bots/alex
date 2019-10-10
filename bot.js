@@ -458,11 +458,11 @@ bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 		var log = await bot.utils.getBanLogByMessage(bot, msg.channel.guild.id, msg.channel.id, msg.id);
 		if(!log) return;
 
-		var receipt = await bot.utils.getReceipt(bot, log.hid, msg.channel.guild.id);
-		if(!receipt) return;
-
 		var ch = await bot.getDMChannel(user);
 		if(!ch) return;
+
+		var receipt = await bot.utils.getReceipt(bot, log.hid, msg.channel.guild.id);
+		if(!receipt) return ch.channel.createMessage("No receipt has been registered for that ban :(");
 
 		var users = await bot.utils.verifyUsers(bot, log.embed.fields[1].value.split("\n"));
 

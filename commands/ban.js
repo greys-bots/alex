@@ -117,6 +117,7 @@ module.exports.subcommands.edit = {
 					name: "**__Reason__**",
 					value: args.slice(1).join(" ")
 				}],
+				color: log.embed.color,
 				timestamp: log.embed.timestamp,
 				footer: log.embed.footer
 			}})
