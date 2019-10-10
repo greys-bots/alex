@@ -121,6 +121,21 @@ async function setup() {
 		emoji 		TEXT
 	)`) //emoji is to keep track of posts from multiple boards
 
+	bot.db.query(`CREATE TABLE IF NOT EXISTS banlogs (
+		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid 		TEXT,
+		server_id 	TEXT,
+		channel_id 	TEXT,
+		message_id 	TEXT
+	)`)
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS receipts (
+		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid 		TEXT,
+		server_id 	TEXT,
+		message		TEXT
+	)`)
+
 	var files = fs.readdirSync("./commands");
 	await Promise.all(files.map(f => {
 		bot.commands[f.slice(0,-3)] = require("./commands/"+f);
@@ -381,7 +396,6 @@ bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 			bot.deleteMessage(msg.channel.id, msg.id);
 			delete bot.pages[msg.id];
 		}
-
 	}
 
 	var cfg = await bot.utils.getConfig(bot, msg.channel.guild.id);
@@ -439,6 +453,33 @@ bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 			}
 		}
 	}
+
+	if(emoji.name == "\u2753" || emoji.name == "\u2754") {
+		var log = await bot.utils.getBanLogByMessage(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+		if(!log) return;
+
+		var receipt = await bot.utils.getReceipt(bot, log.hid, msg.channel.guild.id);
+		if(!receipt) return;
+
+		var ch = await bot.getDMChannel(user);
+		if(!ch) return;
+
+		var users = await bot.utils.verifyUsers(bot, log.embed.fields[1].value.split("\n"));
+
+		try {
+			ch.createMessage({embed: {
+				title: "Ban Receipt",
+				description: receipt.message,
+				fields: [
+					{name: "Users Banned", value: users.info.map(u => `${u.username}#${u.discriminator} (${u.id})`).concat(users.fail.map(u => `${u} - Member deleted?`)).join("\n")},
+					{name: "Reason", value: log.embed.fields[2].value}
+				]
+			}})
+			bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user);
+		} catch(e) {
+			console.log(e);
+		}
+	}
 });
 
 bot.on("messageReactionRemove", async (msg, emoji, user) => {
@@ -452,7 +493,7 @@ bot.on("messageReactionRemove", async (msg, emoji, user) => {
 	else em = emoji.name;
 
 	var message = await bot.getMessage(msg.channel.id, msg.id);
-	await bot.utils.updateStarPost(bot, msg.channel.guild.id, msg.id, {emoji: em, count: message.reactions[em.replace(/^:/,"")].count})
+	await bot.utils.updateStarPost(bot, msg.channel.guild.id, msg.id, {emoji: em, count: message.reactions[em.replace(/^:/,"")] ? message.reactions[em.replace(/^:/,"")].count : 0})
 })
 
 bot.on("messageDelete", async (msg) => {

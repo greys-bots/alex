@@ -620,6 +620,7 @@ module.exports = {
 				fail: [],
 				info: []
 			};
+			console.log(results)
 			await Promise.all(ids.map(async id => {
 				console.log(id)
 				var user;
@@ -700,6 +701,147 @@ module.exports = {
 					res(undefined)
 				} else {
 					res(rows[0]);
+				}
+			})
+		})
+	},
+
+	//bans
+	getBanLog: async (bot, hid, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM banlogs WHERE hid = ? AND server_id = ?`, [hid, server], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var message = await bot.getMessage(rows[0].channel_id, rows[0].message_id);
+
+						if(message) rows[0].embed = message.embeds[0];
+						else {
+							rows[0] = "deleted";
+							await removeBanLog(bot, hid, server)
+						}
+
+						res(rows[0]);
+
+					} else res(undefined)
+				}
+			})
+		})
+	},
+	getBanLogByMessage: async (bot, server, channel, message) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM banlogs WHERE server_id = ? AND channel_id = ? AND message_id = ?`, [server, channel, message], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var message = await bot.getMessage(rows[0].channel_id, rows[0].message_id);
+
+						if(message) rows[0].embed = message.embeds[0];
+						else {
+							rows[0] = "deleted";
+							await removeBanLog(bot, hid, server)
+						}
+
+						res(rows[0]);
+
+					} else res(undefined)
+				}
+			})
+		})
+	},
+	addBanLog: async (bot, hid, server, channel, message) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO banlogs (hid, server_id, channel_id, message_id) VALUES (?, ?, ?, ?)`,[hid, server, channel, message], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true)
+				}
+			})
+		})
+	},
+	removeBanLog: async (bot, hid, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM banlogs WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					bot.db.query(`DELETE FROM receipts WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
+						if(err) {
+							console.log(err);
+							res(false);
+						} else {
+							res(true)
+						}
+					})
+				}
+			})
+		})
+	},
+
+	//receipts
+	getReceipt: async (bot, hid, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM receipts WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows[0])
+				}
+			})
+		})
+	},
+	addReceipt: async (bot, hid, server, message) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO receipts (hid, server_id, message) VALUES (?, ?, ?)`, [hid, server, message], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true);
+				}
+			})
+		})
+	},
+	editReceipt: async (bot, hid, server, message) => {
+		return new Promise(res => {
+			bot.db.query(`UPDATE receipts SET message = ? WHERE hid = ? AND server_id = ?`, [message, hid, server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true);
+				}
+			})
+		})
+	},
+	deleteReceipt: async (bot, hid, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM receipts WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true)
+				}
+			})
+		})
+	},
+	deleteReceipts: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM receipts WHERE server_id = ?`, [server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true)
 				}
 			})
 		})

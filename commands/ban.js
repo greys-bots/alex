@@ -1,6 +1,7 @@
 module.exports = {
 	help: ()=> "[Hack]bans members.",
-	usage: ()=> [" [userID] - Bans member with that ID."],
+	usage: ()=> [" [userID] [userID] ...  (new line) <reason> - Bans member(s) with the given ID(s). NOTE: Reason goes on a new line",
+				 " edit [banID] [new reason] - Edit the reason for a ban"],
 	execute: async (bot, msg, args)=>{
 		var nargs = args.join(" ").split('\n');
 		var membs = nargs[0].split(/,*\s+/);
@@ -39,6 +40,7 @@ module.exports = {
 			var conf = await bot.utils.getConfig(bot, msg.guild.id);
 			var message;
 			var channel;
+			var code = bot.utils.genCode(bot.CHARS);
 			if(!(succ.filter(m => m.pass).length > 0)) {
 				message = {content:'**No users were banned.**', embed: {
 					title: "Results",
@@ -74,6 +76,10 @@ module.exports = {
 						value: reason || "(no reason given)"
 					}
 					],
+					color: 9256253,
+					footer: {
+						text: code
+					},
 					timestamp: new Date()
 				}}
 			}
@@ -81,8 +87,44 @@ module.exports = {
 				var channel = msg.guild.channels.find(ch => ch.id == conf.banlog_channel);
 			else channel = msg.channel;
 
-			channel.createMessage(message)
+			var message = await channel.createMessage(message);
+
+			var scc = await bot.utils.addBanLog(bot, code, msg.guild.id, message.channel.id, message.id);
+			if(scc) msg.channel.createMessage("Log added! ID: "+code);
+			else msg.channel.createMessage("The members have been banned, but the log was not successfully indexed.");
 		});
 	},
-	permissions: ["manageMessages"]
+	permissions: ["manageMessages"],
+	subcommands: {}
+}
+
+module.exports.subcommands.edit = {
+	help: ()=> "Edit a ban message",
+	usage: ()=> [" [banID] [new message] - Edit the message on a ban"],
+	execute: async (bot, msg, args) => {
+		if(!args[1]) return msg.channel.createMessage("Please provide a ban ID and a reason");
+		var log = await bot.utils.getBanLog(bot, args[0].toLowerCase(), msg.guild.id);
+
+		if(!log) return msg.channel.createMessage("Log not found");
+		else if(log == "deleted") return msg.channel.createMessage("Log was deleted due to the message no longer existing");
+
+		console.log(log);
+
+		try {
+			bot.editMessage(log.channel_id, log.message_id, {embed: {
+				title: log.embed.title,
+				fields: [log.embed.fields[0], log.embed.fields[1], {
+					name: "**__Reason__**",
+					value: args.slice(1).join(" ")
+				}],
+				timestamp: log.embed.timestamp,
+				footer: log.embed.footer
+			}})
+		} catch(e) {
+			console.log(e);
+			return msg.channel.createMessage("Something went wrong")
+		}
+		
+		msg.channel.createMessage("Log edited!");
+	}
 }
