@@ -5,8 +5,8 @@ module.exports = {
 		var conf = await bot.utils.getConfig(bot, msg.guild.id);
 		var channel;
 		var nargs = args.join(" ").split("\n");
-		if(conf) channel = msg.guild.channels.find(ch => ch.id == conf.delist_channel) || message.channel;
-		else channel = message.channel;
+		if(conf) channel = msg.guild.channels.find(ch => ch.id == conf.delist_channel) || msg.channel;
+		else channel = msg.channel;
 
 		channel.createMessage({embed: {
 			title: "Server Denied",

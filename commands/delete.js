@@ -41,7 +41,7 @@ module.exports = {
 
 		if(conf.delist_channel) {
 			var channel = msg.guild.channels.find(ch => ch.id == conf.delist_channel);
-			if(!channel) channel = message.channel;
+			if(!channel) channel = msg.channel;
 
 			embeds.forEach(e => {
 				channel.createMessage({embed: {
