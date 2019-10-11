@@ -307,7 +307,14 @@ module.exports = {
 						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[srv,
 							key == "banlog_channel" ? val : "", 
 							key == "reprole" ? val : "", 
-							key == "delist_channel" ? val : "", {}, []]);
+							key == "delist_channel" ? val : "", {}, []], (err, res)=> {
+								if(err) {
+									console.log(err);
+									res(false)
+								} else {
+									res(true)
+								}
+							});
 					} else {
 						bot.db.query(`UPDATE configs SET ?=? WHERE server_id=?`,[key, val, srv], (err, rows)=> {
 							if(err) {
