@@ -40,7 +40,7 @@ module.exports = {
 
 		msg.channel.createMessage(`Current configs:\n`+textconf);
 	},
-	alias: ['conf'],
+	alias: ['conf', 'cfg'],
 	subcommands: {},
 	permissions: ["manageMessages"]
 }
@@ -56,28 +56,9 @@ module.exports.subcommands.banlog = {
 
 		var conf = await bot.utils.getConfig(bot, msg.guild.id);
 
-		if(conf) {
-			bot.db.query(`UPDATE configs SET banlog_channel=? WHERE server_id=?`,[chan.id, msg.guild.id],(err,rows)=>{
-				if(err) {
-					console.log(err);
-					msg.channel.createMessage('Something went wrong.')
-				} else {
-					msg.channel.createMessage('Banlog channel set!');
-				}
-			})
-		} else {
-			bot.db.query(`INSERT INTO configs (server_id, banlog_channel) VALUES (?,?)`,[
-					msg.guild.id,
-					chan.id
-			],(err,rows)=>{
-				if(err) {
-					console.log(err);
-					msg.channel.createMessage('Something went wrong.')
-				} else {
-					msg.channel.createMessage('Banlog channel set!');
-				}
-			})
-		}
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "banlog_channel", chan.id);
+		if(scc) msg.channel.createMessage("Banlog channel set!");
+		else msg.channel.createMessage("Something went wrong");
 	},
 	alias: ['banchannel', "banlogs", "banlogchannel"],
 	permissions: ["manageMessages"]
@@ -94,28 +75,9 @@ module.exports.subcommands.reprole = {
 
 		var conf = await bot.utils.getConfig(bot, msg.guild.id);
 
-		if(conf) {
-			bot.db.query(`UPDATE configs SET reprole=? WHERE server_id=?`,[role.id, msg.guild.id],(err,rows)=>{
-				if(err) {
-					console.log(err);
-					msg.channel.createMessage('Something went wrong.')
-				} else {
-					msg.channel.createMessage('Representative role set!');
-				}
-			})
-		} else {
-			bot.db.query(`INSERT INTO configs (server_id, reprole) VALUES (?,?)`,[
-				msg.guild.id,
-				role.id
-			],(err,rows)=>{
-				if(err) {
-					console.log(err);
-					msg.channel.createMessage('Something went wrong.')
-				} else {
-					msg.channel.createMessage('Representative role set!');
-				}
-			})
-		}
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "reprole", chan.id);
+		if(scc) msg.channel.createMessage("Representative role set!");
+		else msg.channel.createMessage("Something went wrong");
 	},
 	permissions: ["manageMessages"]
 }
@@ -131,28 +93,9 @@ module.exports.subcommands.delist = {
 
 		var conf = await bot.utils.getConfig(bot, msg.guild.id);
 
-		if(conf) {
-			bot.db.query(`UPDATE configs SET delist_channel=? WHERE server_id=?`,[chan.id, msg.guild.id],(err,rows)=>{
-				if(err) {
-					console.log(err);
-					msg.channel.createMessage('Something went wrong.')
-				} else {
-					msg.channel.createMessage('Delist channel set!');
-				}
-			})
-		} else {
-			bot.db.query(`INSERT INTO configs (server_id, delist_channel) VALUES (?,?)`,[
-					msg.guild.id,
-					chan.id
-			],(err,rows)=>{
-				if(err) {
-					console.log(err);
-					msg.channel.createMessage('Something went wrong.')
-				} else {
-					msg.channel.createMessage('Delist channel set!');
-				}
-			})
-		}
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "delist_channel", chan.id);
+		if(scc) msg.channel.createMessage("Delist channel set!");
+		else msg.channel.createMessage("Something went wrong");
 	},
 	alias: ['delistchannel', "delete", "delisting", "deletechannel", "denychannel", "deny"],
 	permissions: ["manageMessages"]
