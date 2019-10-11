@@ -500,5 +500,9 @@ bot.on("messageDelete", async (msg) => {
 	bot.db.query(`DELETE FROM reactposts WHERE server_id=? AND channel_id=? AND message_id=?`,[msg.channel.guild.id, msg.channel.id, msg.id]);
 })
 
+bot.on("guildCreate", async (guild) => {
+	bot.db.query(`INSERT INTO configs (server_id, banlog_channel, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[guild.id, "", "", "", {}, []]);
+})
+
 setup();
 bot.connect();
