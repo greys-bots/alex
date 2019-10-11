@@ -307,7 +307,7 @@ module.exports = {
 						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[srv,
 							key == "banlog_channel" ? val : "", 
 							key == "reprole" ? val : "", 
-							key == "delist_channel" ? val : "", {}, []], (err, res)=> {
+							key == "delist_channel" ? val : "", {}, []], (err, rows)=> {
 								if(err) {
 									console.log(err);
 									res(false)
