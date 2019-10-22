@@ -109,7 +109,7 @@ async function setup() {
 		server_id 	BIGINT,
 		name 		TEXT,
 		actions 	TEXT,
-		`+'`delete`'+` 		INTEGER
+		del 		INTEGER
 	)`)
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS starboard (
