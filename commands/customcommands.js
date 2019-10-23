@@ -62,6 +62,7 @@ module.exports.subcommands.add = {
 					\`\`\`
 					rr - remove a role
 					ar - add a role
+					bl - blacklist user from using the bot
 					\`\`\`
 				Type "finished" to end action adding`);
 
@@ -79,12 +80,25 @@ module.exports.subcommands.add = {
 						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return msg.channel.createMessage("ERR: Role not found. Aborting");
 						actions.push({type: "rr", action:`${target}.ar(rf('${response}'))`})
 						break;
+					case "bl":
+						actions.push({type: "bl", action: `${target}.bl`})
+						break;
 					case "finished":
 						done = true;
 						break;
 					default:
 						return msg.channel.createMessage("ERR: Invalid action. Aborting");
 						break;
+				}
+
+				if(!done) {
+					await msg.channel.createMessage("Enter a success message for this action. NOTE: if using args as the target, this message will fire for every arg. Type `skip` to skip");
+					response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content;
+					if(response.toLowerCase() != "skip") actions[i].success = response;
+
+					await msg.channel.createMessage("Enter a fail message for this action. NOTE: if using args as the target, this message will fire for every arg. Type `skip` to skip");
+					response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content;
+					if(response.toLowerCase() != "skip") actions[i].fail = response;
 				}
 			}
 		} catch(e) {

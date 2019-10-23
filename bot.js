@@ -22,9 +22,11 @@ bot.customActions = [
 	{name: "member.hr", replace: "msg.member.hasRole"},
 	{name: "member.rr", replace: "await msg.member.removeRole"},
 	{name: "member.ar", replace: "await msg.member.addRole"},
+	{name: "member.bl", replace: "await bot.commands.blacklist.execute(bot, msg, [msg.member.id])"},
 	{name: "args.hr", replace: (arg) => "msg.guild.members.find(m => m.id == "+arg+").hasRole"},
 	{name: "args.rr", replace: (arg) => "await msg.guild.members.find(m => m.id == "+arg+").removeRole"},
 	{name: "args.ar", replace: (arg) => "await msg.guild.members.find(m => m.id == "+arg+").addRole"},
+	{name: "args.bl", replace: (arg) => "await bot.commands.blacklist.subcommands.add.execute(bot, msg, [msg.guild.members.find(m => m.id == "+arg+").id])"},
 	{name: "rf\\(('.*')\\)", replace: "msg.guild.roles.find(r => r.name.toLowerCase() == $1.toLowerCase()).id", regex: true}
 ]
 
@@ -251,6 +253,16 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 							`${ac}`
 						), action.success, action.fail]);
 						break;
+					case "bl":
+						var ac = action.action;
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							ac = ac.replace(n, ca.replace);
+						})
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`${ac}`
+						), action.success, action.fail]);
+						break;
 				}
 			} else {
 				switch(action.type) {
@@ -306,6 +318,18 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 							), action.success, action.fail]);
 						})
 						break;
+					case "bl":
+						args.forEach(arg => {
+							var ac = action.action;
+							bot.customActions.forEach(ca => {
+								var n = ca.regex ? new RegExp(ca.name) : ca.name;
+								ac = ac.replace(n, typeof ca.replace == "function" ? ca.replace(arg) : ca.replace);
+							})
+							cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+								`${ac}`
+							), action.success, action.fail]);
+						})
+						break;
 				}
 			}
 			
@@ -319,7 +343,7 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 					await a[0].call(null, bot, msg, args);
 				} catch (e) {
 					if(e) console.log(e);
-					if(a[2]) return await channel.createMessage(a[2] +`\n${e.message}`).then(message => {msgs.push(message)})
+					if(a[2]) return await msg.channel.createMessage(a[2] +`\n${e.message}`).then(message => {msgs.push(message)})
 				}
 				console.log("did the thing")
 				if(a[1]) await msg.channel.createMessage(a[1]).then(message => {
