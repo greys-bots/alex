@@ -30,6 +30,7 @@ module.exports.subcommands.add = {
 		var actions = [];
 		var del;
 		var response;
+		var target;
 		var done = false;
 		await msg.channel.createMessage("Enter a name for the command.");
 		try {
@@ -41,6 +42,18 @@ module.exports.subcommands.add = {
 		var cmd = await bot.utils.getCustomCommand(bot, msg.guild.id, response);
 		if(cmd || bot.commands[response]) return msg.channel.createMessage("ERR: Command with that name exists. Aborting");
 		name = response;
+
+		await msg.channel.createMessage(`Who is the target of the command?
+			\`\`\`
+			user - the person that used the command
+			args - people specified through arguments (using member IDs)
+			\`\`\`
+		`)
+		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
+
+		if(response == "user") target = "member";
+		else if(response == "args") target = "args";
+		else return msg.channel.createMessage("ERR: Invalid target. Aborting");
 
 		try {
 			for(var i = 0; i < 5; i++) {
@@ -58,13 +71,13 @@ module.exports.subcommands.add = {
 						await msg.channel.createMessage("Type the name of the role you want to remove.")
 						response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return msg.channel.createMessage("ERR: Role not found. Aborting");
-						actions.push({type: "rr", action: `member.rr(rf('${response}'))`})
+						actions.push({type: "rr", action: `${target}.rr(rf('${response}'))`})
 						break;
 					case "ar":
 						await msg.channel.createMessage("Type the name of the role you want to add.")
 						response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return msg.channel.createMessage("ERR: Role not found. Aborting");
-						actions.push({type: "rr", action: `member.ar(rf('${response}'))`})
+						actions.push({type: "rr", action:`${target}.ar(rf('${response}'))`})
 						break;
 					case "finished":
 						done = true;
@@ -87,7 +100,8 @@ module.exports.subcommands.add = {
 
 		await msg.channel.createMessage({content: "Is this correct? (y/n)", embed: {
 			title: name,
-			description: del ? "Message will be deleted after command execution" : "Message will not be deleted after command execution",
+			description: (del ? "Message will be deleted after command execution" : "Message will not be deleted after command execution")+"\n"+
+						 (target == "member" ? "Command will affect who is using it" : "Command will affect members given as arguments"),
 			fields: actions.map((a, i) => {
 				return {name: "Action "+(i+1), value: a.action}
 			})
@@ -96,7 +110,7 @@ module.exports.subcommands.add = {
 		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 		if(response != "y") return msg.channel.createMessage("Action aborted");
 
-		var scc = await bot.utils.addCustomCommand(bot, msg.guild.id, name, actions, del);
+		var scc = await bot.utils.addCustomCommand(bot, msg.guild.id, name, actions, target, del);
 		if(scc) msg.channel.createMessage("Custom command added!");
 		else msg.channel.createMessage("Something went wrong");
 		// msg.channel.createMessage("This command is currently under construction. However, manual database editing can be used to create custom commands. USE WITH EXTREME CAUTION.")

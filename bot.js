@@ -22,6 +22,9 @@ bot.customActions = [
 	{name: "member.hr", replace: "msg.member.hasRole"},
 	{name: "member.rr", replace: "await msg.member.removeRole"},
 	{name: "member.ar", replace: "await msg.member.addRole"},
+	{name: "args.hr", replace: (arg) => "msg.guild.members.find(m => m.id == "+arg+").hasRole"},
+	{name: "args.rr", replace: (arg) => "await msg.guild.members.find(m => m.id == "+arg+").removeRole"},
+	{name: "args.ar", replace: (arg) => "await msg.guild.members.find(m => m.id == "+arg+").addRole"},
 	{name: "rf\\(('.*')\\)", replace: "msg.guild.roles.find(r => r.name.toLowerCase() == $1.toLowerCase()).id", regex: true}
 ]
 
@@ -109,6 +112,7 @@ async function setup() {
 		server_id 	BIGINT,
 		name 		TEXT,
 		actions 	TEXT,
+		target 		TEXT,
 		del 		INTEGER
 	)`)
 
@@ -196,56 +200,115 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 		cmd.newActions = [];
 
 		cmd.actions.forEach(action => {
-			switch(action.type) {
-				case "if":
-					var condition = action.condition;
-					var ac = action.action;
-					bot.customActions.forEach(ca => {
-						var n = ca.regex ? new RegExp(ca.name) : ca.name;
-						condition = condition.replace(n, ca.replace)
-						ac = ac.replace(n, ca.replace);
-					})
-					cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
-						`if(${condition}) ${ac};`
-					), action.success, action.fail]);
-					break;
-				case "if:else":
-					var condition = action.condition;
-					var tr = action.action[0];
-					var fls = action.action[1];
-					bot.customActions.forEach(ca => {
-						var n = ca.regex ? new RegExp(ca.name) : ca.name;
-						condition = condition.replace(n, ca.replace)
-						tr = tr.replace(n, ca.replace);
-						fls = fls.replace(n, ca.replace);
-					})
+			console.log(cmd.target);
+			if(cmd.target == "member") {
+				switch(action.type) {
+					case "if":
+						var condition = action.condition;
+						var ac = action.action;
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							condition = condition.replace(n, ca.replace)
+							ac = ac.replace(n, ca.replace);
+						})
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`if(${condition}) ${ac};`
+						), action.success, action.fail]);
+						break;
+					case "if:else":
+						var condition = action.condition;
+						var tr = action.action[0];
+						var fls = action.action[1];
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							condition = condition.replace(n, ca.replace)
+							tr = tr.replace(n, ca.replace);
+							fls = fls.replace(n, ca.replace);
+						})
 
-					cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
-						`if(${condition}) ${tr};
-						 else ${fls}`
-					), action.success, action.fail]);
-					break;
-				case "rr":
-					var ac = action.action;
-					bot.customActions.forEach(ca => {
-						var n = ca.regex ? new RegExp(ca.name) : ca.name;
-						ac = ac.replace(n, ca.replace);
-					})
-					cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
-						`${ac}`
-					), action.success, action.fail]);
-					break;
-				case "ar":
-					var ac = action.action;
-					bot.customActions.forEach(ca => {
-						var n = ca.regex ? new RegExp(ca.name) : ca.name;
-						ac = ac.replace(n, ca.replace);
-					})
-					cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
-						`${ac}`
-					), action.success, action.fail]);
-					break;
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`if(${condition}) ${tr};
+							 else ${fls}`
+						), action.success, action.fail]);
+						break;
+					case "rr":
+						var ac = action.action;
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							ac = ac.replace(n, ca.replace);
+						})
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`${ac}`
+						), action.success, action.fail]);
+						break;
+					case "ar":
+						var ac = action.action;
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							ac = ac.replace(n, ca.replace);
+						})
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`${ac}`
+						), action.success, action.fail]);
+						break;
+				}
+			} else {
+				switch(action.type) {
+					case "if":
+						var condition = action.condition;
+						var ac = action.action;
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							condition = condition.replace(n, ca.replace)
+							ac = ac.replace(n, ca.replace);
+						})
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`if(${condition}) ${ac};`
+						), action.success, action.fail]);
+						break;
+					case "if:else":
+						var condition = action.condition;
+						var tr = action.action[0];
+						var fls = action.action[1];
+						bot.customActions.forEach(ca => {
+							var n = ca.regex ? new RegExp(ca.name) : ca.name;
+							condition = condition.replace(n, ca.replace)
+							tr = tr.replace(n, ca.replace);
+							fls = fls.replace(n, ca.replace);
+						})
+
+						cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+							`if(${condition}) ${tr};
+							 else ${fls}`
+						), action.success, action.fail]);
+						break;
+					case "rr":
+						args.forEach(arg => {
+							var ac = action.action;
+							bot.customActions.forEach(ca => {
+								var n = ca.regex ? new RegExp(ca.name) : ca.name;
+								ac = ac.replace(n, typeof ca.replace == "function" ? ca.replace(arg) : ca.replace);
+							})
+							cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+								`${ac}`
+							), action.success, action.fail]);
+						})
+						break;
+					case "ar":
+						args.forEach(arg => {
+							var ac = action.action;
+							bot.customActions.forEach(ca => {
+								var n = ca.regex ? new RegExp(ca.name) : ca.name;
+								ac = ac.replace(n, typeof ca.replace == "function" ? ca.replace(arg) : ca.replace);
+							})
+							cmd.newActions.push([new AsyncFunction("bot", "msg", "args",
+								`${ac}`
+							), action.success, action.fail]);
+						})
+						break;
+				}
 			}
+			
 		})
 
 		cmd.execute = async (bot, msg, args, cmd) => {
@@ -264,7 +327,7 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 				})
 			})
 			console.log("test");
-			if(cmd.delete) {
+			if(cmd.del) {
 				setTimeout(async ()=> {
 					await msg.delete();
 					console.log(msgs);
