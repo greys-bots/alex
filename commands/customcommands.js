@@ -34,7 +34,7 @@ module.exports.subcommands.add = {
 		var done = false;
 		await msg.channel.createMessage("Enter a name for the command.");
 		try {
-		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
+		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.replace("\s","").toLowerCase();
 		} catch(e) {
 			console.log(e);
 			return msg.channel.createMessage("Action cancelled: timed out");
@@ -130,4 +130,19 @@ module.exports.subcommands.add = {
 		// msg.channel.createMessage("This command is currently under construction. However, manual database editing can be used to create custom commands. USE WITH EXTREME CAUTION.")
 	},
 	permissions: ["manageGuild"]
+}
+
+module.exports.subcommands.delete = {
+	help: ()=> "Delete a custom command",
+	usage: ()=> [" [cmdName] - Deletes the given command"],
+	execute: async (bot, msg, args) => {
+		if(!args[0]) return msg.channel.createMessage("Please provide a command to delete");
+
+		var cmd = await bot.utils.getCustomCommand(bot, msg.guild.id, args[0]);
+		if(!cmd) return msg.channel.createMessage("Command does not exist");
+
+		var scc = await bot.utils.deleteCustomCommand(bot, msg.guild.id, args[0]);
+		if(scc) msg.channel.createMessage("Command deleted!");
+		else msg.channel.createMessage("Something went wrong");
+	}
 }
