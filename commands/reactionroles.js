@@ -92,7 +92,7 @@ module.exports.subcommands.add = {
 		var arg1 = nargs[0].split(" ");
 		var role = msg.roleMentions.length > 0 ?
 				   msg.roleMentions[0] :
-				   msg.guild.roles.find(r => r.id == arg1.slice(0, arg1.length-1) || r.name.toLowerCase() == arg1.slice(0, arg1.length-1));
+				   msg.guild.roles.find(r => r.id == arg1.slice(0, arg1.length-1) || r.name.toLowerCase() == arg1.slice(0, arg1.length-1).join(" ").toLowerCase());
 		if(!role) return msg.channel.createMessage("Role not found");
 		var emoji = arg1.slice(-1)[0].replace(/[<>\s]/g,"");
 		var description = nargs.slice(1).join("\n");
@@ -197,7 +197,7 @@ module.exports.subcommands.bind = {
 
 module.exports.subcommands.emoji = {
 	help: ()=> "Changes emoji for a role",
-	usage: ()=> [" [role] [emoji] - Changes emoji for the given role"],
+	usage: ()=> " [role] [emoji] - Changes emoji for the given role",
 	execute: async (bot, msg, args)=> {
 		var roles = await bot.utils.getReactionRoles(bot, msg.guild.id);
 		if(!roles || roles.length == 0) return msg.channel.createMessage('No reaction roles available');
@@ -222,7 +222,7 @@ module.exports.subcommands.emoji = {
 
 module.exports.subcommands.description = {
 	help: ()=> "Changes description for a role",
-	usage: ()=> [" [role] (new line) [description] - Changes description for the given role"],
+	usage: ()=> " [role] (new line) [description] - Changes description for the given role",
 	execute: async (bot, msg, args)=> {
 		var roles = await bot.utils.getReactionRoles(bot, msg.guild.id);
 		if(!roles || roles.length == 0) return msg.channel.createMessage('No reaction roles available');
