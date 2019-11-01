@@ -163,7 +163,8 @@ module.exports.subcommands.archive = {
 		if(!messages) return msg.channel.createMessage("Either that channel has no messages or I couldn't get them");
 
 		var data = [
-			[`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\n`,
+			[`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}`,
+			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\n`,
 			 `Users involved:\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id}`)}`].join("")
 		];
 		messages.forEach(m => {
@@ -284,7 +285,7 @@ module.exports.subcommands.add = {
 					footer: {
 						text: "Ticket ID: "+ticket.hid
 					},
-					timestamp: t.timestamp
+					timestamp: ticket.timestamp
 				}})
 			} catch(e) {
 				console.log(e);
@@ -349,7 +350,7 @@ module.exports.subcommands.remove = {
 					footer: {
 						text: "Ticket ID: "+ticket.hid
 					},
-					timestamp: t.timestamp
+					timestamp: ticket.timestamp
 				}})
 			} catch(e) {
 				console.log(e);

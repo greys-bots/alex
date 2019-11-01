@@ -1073,7 +1073,8 @@ module.exports = {
 				channel_id: String,
 				first_message: String,
 				opener: String,
-				users: JSON.parse
+				users: JSON.parse,
+				timestamp: String
 			}, async (err, rows)=> {
 				if(err) {
 					console.log(err);
@@ -1118,7 +1119,8 @@ module.exports = {
 				channel_id: String,
 				first_message: String,
 				opener: String,
-				users: JSON.parse
+				users: JSON.parse,
+				timestamp: String
 			}, async (err, rows)=> {
 				if(err) {
 					console.log(err);
