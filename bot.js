@@ -142,6 +142,39 @@ async function setup() {
 		message		TEXT
 	)`)
 
+	bot.db.query(`CREATE TABLE IF NOT EXISTS feedback (
+		id			INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid			TEXT,
+		server_id	TEXT,
+		sender_id 	TEXT,
+		message 	TEXT,
+		anon 		INTEGER
+	)`);
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS ticket_configs (
+		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
+		server_id	TEXT,
+		category_id	TEXT
+	)`)
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS ticket_posts (
+		id			INTEGER PRIMARY KEY AUTOINCREMENT,
+		server_id	TEXT,
+		channel_id	TEXT,
+		message_id	TEXT
+	)`)
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS tickets (
+		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid 			TEXT,
+		server_id 		TEXT,
+		channel_id		TEXT,
+		first_message 	TEXT,
+		opener 			TEXT,
+		users 			TEXT,
+		timestamp 		TEXT
+	)`)
+
 	var files = fs.readdirSync("./commands");
 	await Promise.all(files.map(f => {
 		bot.commands[f.slice(0,-3)] = require("./commands/"+f);
@@ -149,6 +182,12 @@ async function setup() {
 			setTimeout(res("a"),100)
 		})
 	})).then(()=> console.log("finished loading commands."));
+}
+
+bot.formatTime = (date) => {
+	if(typeof date == "string") date = new Date(date);
+
+	return `${(date.getMonth()+1) < 10 ? "0"+(date.getMonth()+1) : (date.getMonth()+1)}.${(date.getDate()) < 10 ? "0"+(date.getDate()) : (date.getDate())}.${date.getFullYear()} at ${date.getHours() < 10 ? "0"+date.getHours() : date.getHours()}:${date.getMinutes() < 10 ? "0"+date.getMinutes() : date.getMinutes()}`
 }
 
 bot.asyncForEach = async (arr, bot, msg, args, cb) => {
@@ -338,25 +377,20 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 		cmd.execute = async (bot, msg, args, cmd) => {
 			let msgs = [];
 			await bot.asyncForEach(cmd.newActions, bot, msg, args, async (bot, msg, args, a) => {
-				console.log(a);
 				try {
 					await a[0].call(null, bot, msg, args);
 				} catch (e) {
 					if(e) console.log(e);
 					if(a[2]) return await msg.channel.createMessage(a[2] +`\n${e.message}`).then(message => {msgs.push(message)})
 				}
-				console.log("did the thing")
 				if(a[1]) await msg.channel.createMessage(a[1]).then(message => {
 					msgs.push(message);
 				})
 			})
-			console.log("test");
 			if(cmd.del) {
 				setTimeout(async ()=> {
 					await msg.delete();
-					console.log(msgs);
 					await Promise.all(msgs.map(async m => {
-						console.log(m);
 						await m.delete()
 						return new Promise(res => res(""))
 					}))
@@ -393,7 +427,8 @@ bot.commands.help = {
 						`**Aliases:** ${cmd.alias ? cmd.alias.join(", ") : "(none)"}\n\n`,
 						`**Subcommands**\n${cmd.subcommands ?
 							Object.keys(cmd.subcommands).map(sc => `**${bot.prefix}${sc}** - ${cmd.subcommands[sc].help()}`).join("\n") : 
-							"(none)"}`
+							"(none)"}`,
+						(cmd.desc ? "\n\n"+cmd.desc() : "")
 					].join(""),
 					footer: {
 						icon_url: bot.user.avatarURL,
@@ -429,7 +464,7 @@ bot.on("ready",()=>{
 
 bot.on("messageCreate",async (msg)=>{
 	if(msg.author.bot) return;
-	if(!msg.guild) return msg.channel.createMessage("This bot is intended to be used in guilds only :(");
+	// if(!msg.guild) return msg.channel.createMessage("This bot should be used in guilds only");
 	var prefix = new RegExp("^"+bot.prefix, "i");
 	if(!msg.content.toLowerCase().match(prefix)) return;
 	let args = msg.content.replace(prefix, "").split(" ");
@@ -437,7 +472,8 @@ bot.on("messageCreate",async (msg)=>{
 	if(!cmd) cmd = await bot.parseCustomCommand(bot, msg, args);
 	console.log(cmd);
 	if(cmd) {
-		var cfg = await bot.utils.getConfig(bot, msg.guild.id);
+
+		var cfg = msg.guild ? await bot.utils.getConfig(bot, msg.guild.id) : {};
 		if(cfg && cfg.blacklist && cfg.blacklist.includes(msg.author.id)) return msg.channel.createMessage("You have been banned from using this bot.");
 		if(!cmd[0].permissions || (cmd[0].permissions && cmd[0].permissions.filter(p => msg.member.permission.has(p)).length == cmd[0].permissions.length)) {
 			cmd[0].execute(bot, msg, cmd[1], cmd[0]);
@@ -567,6 +603,31 @@ bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 			console.log(e);
 		}
 	}
+
+	var tpost = await bot.utils.getTicketPost(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+	if(tpost) {
+		await bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user);
+		var ch = await bot.getDMChannel(user);
+		var tickets = await bot.utils.getSupportTicketsByUser(bot, msg.channel.guild.id, user);
+		if(tickets && tickets.length >= 5) {
+			try {
+				return ch.createMessage("Couldn't open ticket: you already have 5 open for that server")
+			} catch(e) {
+				console.log(e);
+				return;
+			}
+		}
+		var us = await bot.utils.fetchUser(bot, user);
+		var ticket = await bot.utils.createSupportTicket(bot, msg.channel.guild.id, us);
+		if(!ticket.hid) {
+			try {
+				ch.createMessage("Couldn't open your support ticket:\n"+ticket.err);
+			} catch(e) {
+				console.log(e);
+				return;
+			}	
+		}
+	}
 });
 
 bot.on("messageReactionRemove", async (msg, emoji, user) => {
@@ -585,6 +646,11 @@ bot.on("messageReactionRemove", async (msg, emoji, user) => {
 
 bot.on("messageDelete", async (msg) => {
 	bot.db.query(`DELETE FROM reactposts WHERE server_id=? AND channel_id=? AND message_id=?`,[msg.channel.guild.id, msg.channel.id, msg.id]);
+	await bot.utils.deleteTicketPost(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+})
+
+bot.on("channelDelete", async (channel) => {
+	await bot.utils.deleteSupportTicket(bot, channel.guild.id, channel.id);
 })
 
 bot.on("guildCreate", async (guild) => {
