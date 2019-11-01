@@ -162,11 +162,7 @@ module.exports.subcommands.archive = {
 		var messages = await channel.getMessages(10000, null, ticket.first_message);
 		if(!messages) return msg.channel.createMessage("Either that channel has no messages or I couldn't get them");
 
-		var data = [
-			[`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}`,
-			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\n`,
-			 `Users involved:\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id}`)}`].join("")
-		];
+		var data = [];
 		messages.forEach(m => {
 			var date = new Date(m.timestamp);
 			data.push([`ID: ${m.id}`,
@@ -180,7 +176,9 @@ module.exports.subcommands.archive = {
 		if(!c) return msg.channel.createMessage("Please make sure I can DM you");
 
 		try {
-			c.createMessage("Here is the archive: ",{file: Buffer.from(data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
+			c.createMessage("Here is the archive: ",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}`,
+			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\n`,
+			 `Users involved:\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id}`)}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
 		} catch(e) {
 			console.log(e);
 			return msg.channel.createMessage("Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error");
