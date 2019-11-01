@@ -176,9 +176,9 @@ module.exports.subcommands.archive = {
 		if(!c) return msg.channel.createMessage("Please make sure I can DM you");
 
 		try {
-			c.createMessage("Here is the archive: ",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}`,
-			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\n`,
-			 `Users involved:\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id}`)}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
+			c.createMessage("Here is the archive: ",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
+			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\r\n`,
+			 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id}`)}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
 		} catch(e) {
 			console.log(e);
 			return msg.channel.createMessage("Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error");
