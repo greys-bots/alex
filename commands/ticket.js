@@ -177,8 +177,8 @@ module.exports.subcommands.archive = {
 
 		try {
 			c.createMessage("Here is the archive: ",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
-			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id}\r\n`,
-			 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id}`)}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
+			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})\r\n`,
+			 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`)}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
 		} catch(e) {
 			console.log(e);
 			return msg.channel.createMessage("Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error");
