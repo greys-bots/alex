@@ -125,9 +125,9 @@ module.exports = {
 			})
 		})
 	},
-	updateServer: async (bot, host, id, prop, val)=> {
+	updateServer: async (bot, host, id, key, val)=> {
 		return new Promise(res=>{
-			bot.db.query(`UPDATE servers SET ?=? WHERE host_id=? AND server_id=?`, [prop, val, host, id], (err, rows)=>{
+			bot.db.query(`UPDATE servers SET ?=? WHERE host_id=? AND server_id=?`, [key, val, host, id], (err, rows)=>{
 				if(err) {
 					console.log(err);
 					res(false);
@@ -283,6 +283,7 @@ module.exports = {
 				id: Number,
 		        server_id: String,
 		        banlog_channel: String,
+		        ban_message: String,
 		        reprole: String,
 		        delist_channel: String,
 		        starboard: JSON.parse,
@@ -304,27 +305,17 @@ module.exports = {
 					console.log(err);
 				} else {
 					if(!rows[0]) {
-						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[srv,
-							key == "banlog_channel" ? val : "", 
-							key == "reprole" ? val : "", 
-							key == "delist_channel" ? val : "", {}, []], (err, rows)=> {
-								if(err) {
-									console.log(err);
-									res(false)
-								} else {
-									res(true)
-								}
-							});
-					} else {
-						bot.db.query(`UPDATE configs SET ?=? WHERE server_id=?`,[key, val, srv], (err, rows)=> {
-							if(err) {
-								console.log(err);
-								res(false)
-							} else {
-								res(true)
-							}
-						})
+						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES (?,?,?,?,?,?,?)`,[srv, "", "", "", "", {}, [], {}]);
 					}
+
+					bot.db.query(`UPDATE configs SET ?=? WHERE server_id=?`,[key, val, srv], (err, rows)=> {
+						if(err) {
+							console.log(err);
+							res(false)
+						} else {
+							res(true)
+						}
+					})
 				}
 			})
 		})
@@ -433,6 +424,25 @@ module.exports = {
 					res(undefined);
 				} else {
 					res(rows[0]);
+				}
+			})
+		})
+	},
+	getReactionRolePosts: async (bot, id) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM reactposts WHERE server_id = ?`,[id], {
+				id: Number,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				roles: JSON.parse,
+				page: Number
+			}, (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows)
 				}
 			})
 		})
@@ -723,6 +733,18 @@ module.exports = {
 			})
 		})
 	},
+	getStarPosts: async (bot, server) => {
+		return new Promise((res) => {
+			bot.db.query(`SELECT * FROM starboard WHERE server_id=?`,[server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined)
+				} else {
+					res(rows);
+				}
+			})
+		})
+	},
 	getStarPost: async (bot, server, msg, emoji) => {
 		return new Promise((res) => {
 			bot.db.query(`SELECT * FROM starboard WHERE server_id=? AND original_id=? AND emoji=?`,[server, msg, emoji], (err, rows) => {
@@ -737,6 +759,54 @@ module.exports = {
 	},
 
 	//bans
+	getRawBanLogs: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM banlogs WHERE server_id = ?`, [server], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) res(rows);
+					else res(undefined)
+				}
+			})
+		})
+	},
+	getBanLogs: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM banlogs WHERE server_id = ?`, [server], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var logs = [];
+						await Promise.all(rows.map(async b => {
+							var message;
+							try {
+								message = await bot.getMessage(b.channel_id, b.message_id);
+							} catch(e) {
+								console.log(e.stack);
+								message = undefined;
+							}
+
+							if(message) {
+								b.embed = message.embeds[0];
+								logs.push(b);
+							} else {
+								await bot.utils.removeBanLog(bot, b.hid, server)
+							}
+
+							return Promise.resolve()
+						}))
+
+						res(logs);
+
+					} else res(undefined)
+				}
+			})
+		})
+	},
 	getBanLog: async (bot, hid, server) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM banlogs WHERE hid = ? AND server_id = ?`, [hid, server], async (err, rows) => {
@@ -748,10 +818,7 @@ module.exports = {
 						var message = await bot.getMessage(rows[0].channel_id, rows[0].message_id);
 
 						if(message) rows[0].embed = message.embeds[0];
-						else {
-							rows[0] = "deleted";
-							await removeBanLog(bot, hid, server)
-						}
+						else await bot.utils.removeBanLog(bot, rows[0].hid, server);
 
 						res(rows[0]);
 
@@ -816,6 +883,18 @@ module.exports = {
 	},
 
 	//receipts
+	getReceipts: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM receipts WHERE server_id = ?`, [server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows)
+				}
+			})
+		})
+	},
 	getReceipt: async (bot, hid, server) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM receipts WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
@@ -1040,9 +1119,9 @@ module.exports = {
 			})
 		})
 	},
-	createSupportConfig: async (bot, server, category) => {
+	createSupportConfig: async (bot, server, category, archives) => {
 		return new Promise(res => {
-			bot.db.query(`INSERT INTO ticket_configs (server_id, category_id) VALUES (?,?)`,[server, category], (err, rows)=> {
+			bot.db.query(`INSERT INTO ticket_configs (server_id, category_id) VALUES (?,?)`,[server, category, archives], (err, rows)=> {
 				if(err) {
 					console.log(err);
 					res(false);
@@ -1054,14 +1133,26 @@ module.exports = {
 	},
 	updateSupportConfig: async (bot, server, key, val) => {
 		return new Promise(res => {
-			bot.db.query(`UPDATE ticket_configs SET ?=? WHERE server_id=?`,[key, val, server], (err, rows)=> {
-				if(err) {
-					console.log(err);
-					res(false)
-				} else {
-					res(true)
-				}
-			})
+			if(val) {
+				bot.db.query(`UPDATE ticket_configs SET ?=? WHERE server_id=?`,[key, val, server], (err, rows)=> {
+					if(err) {
+						console.log(err);
+						res(false)
+					} else {
+						res(true)
+					}
+				})
+			} else {
+				console.log(`UPDATE ticket_configs SET ${key.map((k,i) => (i%2 == 0 ? "?=?" : null)).filter(x => x!=null).join(",")} WHERE server_id=?`)
+				bot.db.query(`UPDATE ticket_configs SET ${key.map((k,i) => (i%2 == 0 ? "?=?" : null)).filter(x => x!=null).join(",")} WHERE server_id=?`,[...key, server], (err, rows)=> {
+					if(err) {
+						console.log(err);
+						res(false)
+					} else {
+						res(true)
+					}
+				})
+			}
 		})
 	},
 	getSupportTickets: async (bot, server) => {
@@ -1190,12 +1281,20 @@ module.exports = {
 				console.log(e);
 				return res({err: "Could not send message; please make sure I have permission"})
 			}
-			bot.db.query(`INSERT INTO tickets (hid, server_id, channel_id, first_message, opener, users, timestamp) VALUES (?,?,?,?,?,?,?)`,[code, server, channel.id, message.id, user.id, [user.id], time.toISOString()], (err, rows)=> {
+
+			var scc = await bot.utils.addSupportTicket(bot, code, server, channel.id, message.id, user.id, [user.id], time.toISOString());
+			if(scc) res({hid: code});
+			else res({err: "Couldn't insert data"})
+		})
+	},
+	addSupportTicket: async (bot, hid, server, channel, message, opener, users, timestamp) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO tickets (hid, server_id, channel_id, first_message, opener, users, timestamp) VALUES (?,?,?,?,?,?,?)`,[hid, server, channel, message, opener, users, timestamp], (err, rows)=> {
 				if(err) {
 					console.log(err);
-					res({err: "Couldn't insert data"})
+					res(false)
 				} else {
-					res({hid: code});
+					res(true);
 				}
 			})
 		})
@@ -1275,5 +1374,38 @@ module.exports = {
 				}
 			})
 		})
-	}
+	},
+
+	//import/export
+	getExportData: async (bot, server) => {
+		return new Promise(async res => {
+			var config = await bot.utils.getConfig(bot, server);
+			var servers = await bot.utils.getServers(bot, server);
+			var serverposts = await bot.utils.getAllPosts(bot, server);
+			var reactionroles = await bot.utils.getReactionRoles(bot, server);
+			var reactioncategories = await bot.utils.getReactionCategories(bot, server);
+			var reactionposts = await bot.utils.getReactionRolePosts(bot, server);
+			var starposts = await bot.utils.getStarPosts(bot, server);
+			var banlogs = await bot.utils.getRawBanLogs(bot, server);
+			var receipts = await bot.utils.getReceipts(bot, server);
+			var supportconfig = await bot.utils.getSupportConfig(bot, server);
+			var ticketposts = await bot.utils.getTicketPosts(bot, server);
+			var customcommands = await bot.utils.getCustomCommands(bot, server);
+
+			res({
+				config: config,
+				servers: servers,
+				posts: serverposts,
+				reaction_roles: reactionroles,
+				reaction_categories: reactioncategories,
+				reaction_posts: reactionposts,
+				star_posts: starposts,
+				ban_logs: banlogs,
+				receipts: receipts,
+				support_config: supportconfig,
+				ticket_posts: ticketposts,
+				custom_commands: customcommands
+			});
+		})
+	},
 }

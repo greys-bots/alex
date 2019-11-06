@@ -6,23 +6,49 @@ module.exports = {
 		var nargs = args.join(" ").split('\n');
 		var membs = nargs[0].split(/,*\s+/);
 		var reason = nargs.slice(1, nargs.length).join('\n')
+		var conf = await bot.utils.getConfig(bot, msg.guild.id);
+		if(!conf) conf = {};
+		else if(conf.ban_message) {
+			Object.keys(bot.banVars).forEach(bv => {
+				conf.ban_message = conf.ban_message.replace(bv, eval("`"+bot.banVars[bv]+"`","g"));
+			})
+		}
 		var succ = [];
 		async function banMembers (){
 			return await Promise.all(membs.map(async (m) => {
 				await bot.getRESTUser(m).then(async (u)=>{
-					await msg.guild.getBans().then(b=>{
-						if(b){
-							if(b.find(x => x.user.id == m)){
-								succ.push({id:m,pass:true,info:u});
-							} else {
-								bot.banGuildMember(msg.guild.id,m,0,reason || "Banned through command.");
-								succ.push({id:m,pass:true,info:u})
-							}
+					var b = await msg.guild.getBans()
+					if(b){
+						if(b.find(x => x.user.id == m)){
+							succ.push({id:m,pass:true,info:u});
 						} else {
+							if(msg.guild.members.find(mb => mb.id == m) && conf.ban_message) {
+								var ch = await bot.getDMChannel(m);
+								if(ch) {
+									try {
+										ch.createMessage(conf.ban_message);
+									} catch(e) {
+										console.log(e.stack)
+									}
+								}
+							}
 							bot.banGuildMember(msg.guild.id,m,0,reason || "Banned through command.");
 							succ.push({id:m,pass:true,info:u})
 						}
-					})
+					} else {
+						if(msg.guild.members.find(mb => mb.id == m) && conf.banmsg) {
+							var ch = await bot.getDMChannel(m);
+							if(ch) {
+								try {
+									ch.createMessage(conf.ban_message);
+								} catch(e) {
+									console.log(e.stack)
+								}
+							}
+						}
+						bot.banGuildMember(msg.guild.id,m,0,reason || "Banned through command.");
+						succ.push({id:m,pass:true,info:u})
+					}
 				}).catch(e=>{
 					console.log(e);
 					succ.push({id:m,pass:false,reason:"User does not exist."});
@@ -95,7 +121,8 @@ module.exports = {
 		});
 	},
 	permissions: ["manageMessages"],
-	subcommands: {}
+	subcommands: {},
+	guildOnly: true
 }
 
 module.exports.subcommands.edit = {
@@ -127,5 +154,6 @@ module.exports.subcommands.edit = {
 		}
 		
 		msg.channel.createMessage("Log edited!");
-	}
+	},
+	guildOnly: true
 }

@@ -12,7 +12,7 @@ module.exports = {
 				 " config - Configure the ticket system. Use `hub!help ticket config` for more info"],
 	desc: ()=> "Before using this, you should run `hub!ticket config`. Use `hub!ticket post [channel]` or `hub!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
 	execute: async (bot, msg, args) => {
-		var tickets = await bot.utils.getTickets(bot, msg.guild.id);
+		var tickets = await bot.utils.getSupportTickets(bot, msg.guild.id);
 		if(!tickets) return msg.channel.createMessage("No support tickets registered for this server");
 
 		if(tickets.length > 10) {
@@ -57,9 +57,9 @@ module.exports = {
 						name: `Ticket ${t.hid}`,
 						value: [
 							`[first message](https://discordapp.com/channels/${msg.guild.id}/${t.channel_id}/${t.first_message})`,
-							`Opener: ${t.opener.username}#${t.opener.discriminator} (${t.opener.id})`
+							`Opener: ${t.opener.username}#${t.opener.discriminator} (${t.opener.id})`,
 							`Users:\n${t.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")}`
-						].join("\n\n")
+						].join("\n")
 					}
 				})
 			}})
@@ -118,26 +118,38 @@ module.exports.subcommands.config = {
 				 " setup - Run the config menu"],
 	execute: async (bot, msg, args) => {
 		var cfg = await bot.utils.getSupportConfig(bot, msg.guild.id);
-		if(!cfg) cfg = {category_id: ""};
+		if(!cfg) cfg = {category_id: "", archives_id: ""};
+
+		var category = cfg.category_id != "" ? msg.guild.channels.find(c => c.id == cfg.category_id) : undefined;
+		var archives = cfg.archives_id != "" ? msg.guild.channels.find(c => c.id == cfg.archives_id) : undefined;
 
 		if(!args[0] || args[0] != "setup") return msg.channel.createMessage({embed: {
 			title: "Ticket Config",
 			fields: [
-				{name: "Category ID", value: (cfg.category_id == "" ? "(*not set*)" : cfg.category_id)}
+				{name: "Category ID", value: (category ? category.name.toLowerCase() : "*(not set)*")},
+				{name: "Archive channel ID", value: (archives ? archives.name.toLowerCase() : "*(not set)*")}
 			]
 		}});
+
+		var resp;
 		
-		await msg.channel.createMessage("Enter the category that tickets should be created in. This can be the category name or ID. You have 1 minute to do this\nNOTE: This category's permissions should only allow mods and I to see channels; I handle individual permissions for users!");
-		var resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
+		await msg.channel.createMessage("Enter the category that tickets should be created in. This can be the category name or ID. You have 1 minute to do this\nNOTE: This category's permissions should only allow mods and I to see channels; I handle individual permissions for users!"+(category ? "\nType `skip` to keep the current value" : ""));
+		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
 		if(!resp[0]) return msg.channel.createMessage("Action cancelled: timed out");
-		var channel = await msg.guild.channels.find(c => (c.id == resp[0].content || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 4);
-		if(!channel) return msg.channel.createMessage("Action cancelled: category not found");
+		if(!(category && resp[0].content.toLowerCase() == "skip")) category = await msg.guild.channels.find(c => (c.id == resp[0].content || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 4);
+		if(!category) return msg.channel.createMessage("Action cancelled: category not found");
+
+		await msg.channel.createMessage("Enter the channel that archived tickets should be sent to. This can be the channel name, #mention, or ID. You have 1 minute to do this\nNOTE: This is not required. Type `skip` to skip it, and archives will be sent to your DMs instead");;
+		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
+		if(!resp[0]) return msg.channel.createMessage("Action cancelled: timed out");
+		if(resp[0].content.toLowerCase() != "skip") archives = await msg.guild.channels.find(c => (c.id == resp[0].content || c.name.toLowerCase() == resp[0].content.replace(/<#>/g,"").toLowerCase()) && c.type == 0);
+		if(!archives && resp[0].toLowerCase() != "skip") return msg.channel.createMessage("Action cancelled: category not found");
 
 		var scc;
 		if(cfg.category_id == "") {
-			scc = await bot.utils.createSupportConfig(bot, msg.guild.id, channel.id);
+			scc = await bot.utils.createSupportConfig(bot, msg.guild.id, category.id, archives.id);
 		} else {
-			scc = await bot.utils.updateSupportConfig(bot, msg.guild.id, "category_id", channel.id);
+			scc = await bot.utils.updateSupportConfig(bot, msg.guild.id, ["category_id", category.id, "archives_id", archives.id]);
 		}
 
 		if(scc) msg.channel.createMessage("Config set!");
@@ -145,6 +157,7 @@ module.exports.subcommands.config = {
 	},
 	permissions: ["manageGuild"],
 	guildOnly: true,
+	alias: ['conf', 'cfg']
 }
 
 module.exports.subcommands.archive = {
@@ -153,6 +166,9 @@ module.exports.subcommands.archive = {
 				 " [hid] - Sends the user a text transcript of the ticket with the given hid and deletes its channel"],
 	desc: ()=> "This command does NOT save images. Please save images yourself before using the command!",
 	execute: async (bot, msg, args) => {
+		var config = await bot.utils.getSupportConfig(bot, msg.guild.id);
+		if(!config) config = {archives_id: null};
+		
 		var ticket = args[0] ? await bot.utils.getSupportTicket(bot, msg.guild.id, args[0].toLowerCase()) : await bot.utils.getSupportTicketByChannel(bot, msg.guild.id, msg.channel.id);
 		if(!ticket) return msg.channel.createMessage("Please provide a valid ticket hid or use this command in a ticket channel");
 
@@ -172,16 +188,45 @@ module.exports.subcommands.archive = {
 						`\r\n${m.content}`].join(""))
 		})
 
-		var c = await bot.getDMChannel(msg.author.id);
-		if(!c) return msg.channel.createMessage("Please make sure I can DM you");
+		var c;
+		if(config.archives_id) {
+			c = msg.guild.channels.find(ch => ch.id == config.archives_id);
+			if(!c) return msg.channel.createMessage("Couldn't find your archives channel; please reconfigure it");
 
-		try {
-			c.createMessage("Here is the archive: ",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
-			`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})\r\n`,
-			 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\r\n")}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
-		} catch(e) {
-			console.log(e);
-			return msg.channel.createMessage("Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error");
+			var date = new Date();
+
+			var embed = {
+				title: "Support Ticket Archive",
+				fields: [
+					{name: "Time opened", value: bot.formatTime(new Date(ticket.timestamp))},
+					{name: "Opener", value: `${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})`},
+					{name: "Users involved", value: ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")},
+					{name: "Time closed", value: bot.formatTime(date)}
+				],
+				timestamp: date.toISOString(),
+				color: 5821280
+			}
+			try {
+				c.createMessage({embed: embed},{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
+				`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})\r\n`,
+				 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\r\n")}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
+			} catch(e) {
+				console.log(e);
+				return msg.channel.createMessage("Error while sending the archive:\n"+e.message+"\n\nAction aborted due to error");
+			}
+		} else {
+			c = await bot.getDMChannel(msg.author.id);
+			if(!c) return msg.channel.createMessage("Please make sure I can DM you");
+
+			try {
+				c.createMessage("Here is the archive:",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
+				`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})\r\n`,
+				 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\r\n")}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
+			} catch(e) {
+				console.log(e);
+				return msg.channel.createMessage("Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error");
+			}
+
 		}
 
 		try {
@@ -192,9 +237,7 @@ module.exports.subcommands.archive = {
 		}
 
 		var scc = await bot.utils.deleteSupportTicket(bot, msg.guild.id, channel.id);
-		if(scc) {
-			channel.id == msg.channel.id ? c.createMessage("Ticket successfully archived and deleted!") : msg.channel.createMessage("Ticket successfully archived and deleted!")
-		} else {
+		if(!scc) {
 			channel.id == msg.channel.id ? c.createMessage("Ticket archived, but could not be deleted from the database") : msg.channel.createMessage("Ticket archived, but could not be deleted from the database")
 		}
 	},

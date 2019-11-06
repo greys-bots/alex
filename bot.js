@@ -30,6 +30,11 @@ bot.customActions = [
 	{name: "rf\\(('.*')\\)", replace: "msg.guild.roles.find(r => r.name.toLowerCase() == $1.toLowerCase()).id", regex: true}
 ]
 
+bot.banVars = {
+	"$REASON": "${reason}",
+	"$SERVER.NAME": "${msg.guild.name}"
+}
+
 bot.status = 0;
 
 const updateStatus = function(){
@@ -77,6 +82,7 @@ async function setup() {
     	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
         server_id   	BIGINT,
         banlog_channel	BIGINT,
+        ban_message		TEXT,
         reprole 		BIGINT,
         delist_channel	BIGINT,
         starboard 		TEXT,
@@ -154,7 +160,8 @@ async function setup() {
 	bot.db.query(`CREATE TABLE IF NOT EXISTS ticket_configs (
 		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
 		server_id	TEXT,
-		category_id	TEXT
+		category_id	TEXT,
+		archives_id TEXT
 	)`)
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS ticket_posts (
@@ -640,21 +647,51 @@ bot.on("messageReactionRemove", async (msg, emoji, user) => {
 	if(emoji.id) em = `:${emoji.name}:${emoji.id}`;
 	else em = emoji.name;
 
-	var message = await bot.getMessage(msg.channel.id, msg.id);
-	await bot.utils.updateStarPost(bot, msg.channel.guild.id, msg.id, {emoji: em, count: message.reactions[em.replace(/^:/,"")] ? message.reactions[em.replace(/^:/,"")].count : 0})
+	try {
+		var message = await bot.getMessage(msg.channel.id, msg.id);
+		await bot.utils.updateStarPost(bot, msg.channel.guild.id, msg.id, {emoji: em, count: message.reactions[em.replace(/^:/,"")] ? message.reactions[em.replace(/^:/,"")].count : 0})
+	} catch(e) {
+		console.log("Error attempting to get message/update starboard post:\n"+e.stack);
+	}
 })
 
 bot.on("messageDelete", async (msg) => {
-	bot.db.query(`DELETE FROM reactposts WHERE server_id=? AND channel_id=? AND message_id=?`,[msg.channel.guild.id, msg.channel.id, msg.id]);
-	await bot.utils.deleteTicketPost(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+	try {
+		bot.db.query(`DELETE FROM reactposts WHERE server_id=? AND channel_id=? AND message_id=?`,[msg.channel.guild.id, msg.channel.id, msg.id]);
+		await bot.utils.deleteTicketPost(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+
+		var log = await bot.utils.getBanLogByMessage(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+		if(log) await bot.utils.removeBanLog(bot, log.hid, msg.channel.guild.id);
+	} catch(e) {
+		console.log("Error deleting react post or ticket post:\n"+e.stack);
+	}
 })
 
 bot.on("channelDelete", async (channel) => {
-	await bot.utils.deleteSupportTicket(bot, channel.guild.id, channel.id);
+	try {
+		await bot.utils.deleteSupportTicket(bot, channel.guild.id, channel.id);
+	} catch(e) {
+		console.log("Error deleting support ticket:\n"+e.stack)
+	}
 })
 
 bot.on("guildCreate", async (guild) => {
-	bot.db.query(`INSERT INTO configs (server_id, banlog_channel, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[guild.id, "", "", "", {}, []]);
+	var conf = await bot.utils.getConfig(guild.id);
+	if(!conf) bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[guild.id, "", "", "", "", {}, []]);
+})
+
+bot.on("guildDelete", async (guild) => {
+	try {
+		var data = await bot.utils.getExportData(bot, guild.id);
+		var ch = await bot.getDMChannel(guild.ownerID);
+		if(!ch) return;
+		ch.createMessage(["Hi! I'm sending you this because you removed me from your server. ",
+			"After 24 hours, all the data I have indexed for it will be deleted. ",
+			"If you invite me back after 24 hours are up and would like to start up ",
+			"where you left off, you can use this file to do so:"].join(""));
+	} catch(e) {
+		console.log("Error attempting to export/deliver data after being kicked:\n"+e.stack)
+	}
 })
 
 setup();
