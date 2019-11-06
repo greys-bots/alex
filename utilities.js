@@ -287,7 +287,8 @@ module.exports = {
 		        reprole: String,
 		        delist_channel: String,
 		        starboard: JSON.parse,
-		        blacklist: JSON.parse
+		        blacklist: JSON.parse,
+		        feedback: JSON.parse
 			}, (err,rows)=>{
 				if(err) {
 					console.log(err);
@@ -305,7 +306,7 @@ module.exports = {
 					console.log(err);
 				} else {
 					if(!rows[0]) {
-						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES (?,?,?,?,?,?,?)`,[srv, "", "", "", "", {}, [], {}]);
+						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES (?,?,?,?,?,?,?,?)`,[srv, "", "", "", "", {}, [], {}]);
 					}
 
 					bot.db.query(`UPDATE configs SET ?=? WHERE server_id=?`,[key, val, srv], (err, rows)=> {

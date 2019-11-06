@@ -677,7 +677,7 @@ bot.on("channelDelete", async (channel) => {
 
 bot.on("guildCreate", async (guild) => {
 	var conf = await bot.utils.getConfig(guild.id);
-	if(!conf) bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist) VALUES (?,?,?,?,?,?)`,[guild.id, "", "", "", "", {}, []]);
+	if(!conf) bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES (?,?,?,?,?,?,?,?)`,[srv, "", "", "", "", {}, [], {}]);
 })
 
 bot.on("guildDelete", async (guild) => {
