@@ -11,8 +11,8 @@ bot.db		= dblite('data.sqlite',"-header");
 bot.utils = require('./utilities')
 
 bot.CHARS = process.env.CHARS;
-
-bot.prefix		= process.env.PREFIX;
+bot.prefix = process.env.PREFIX;
+bot.owner = process.env.OWNER;
 
 bot.fetch = require('node-fetch');
 
