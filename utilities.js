@@ -982,12 +982,12 @@ module.exports = {
 			var receipt = await bot.utils.getReceipt(bot, hid1, server);
 			var receipt2 = await bot.utils.getReceipt(bot, hid2, server);
 			if(!receipt) {
-				bot.db.query(`INSERT INTO receipts (hid, server_id, message, link) VALUES (?,?,?,?)`, [hid1, server, message, [hid1, hid2]], (err, rows)=> {
+				bot.db.query(`INSERT INTO receipts (hid, server_id, message, link) VALUES (?,?,?,?)`, [hid1, server, message, receipt2.link || hid2], (err, rows)=> {
 					if(err) {
 						console.log(err);
 						res(false);
 					} else {
-						bot.db.query(`UPDATE receipts SET message=?, link=? WHERE hid=? AND server_id=?`, [message, hid2, hid2, server], (err, rows)=> {
+						bot.db.query(`UPDATE receipts SET message=?, link=? WHERE hid=? AND server_id=?`, [message, receipt2.link || hid2, hid2, server], (err, rows)=> {
 							if(err) {
 								console.log(err);
 								res(false);
@@ -1017,8 +1017,8 @@ module.exports = {
 			} else {
 				bot.db.query(`UPDATE receipts SET message=?, link=? WHERE hid=? AND server_id=?;
 							  UPDATE receipts SET message=?, link=? WHERE hid=? AND server_id=?`,
-							  [message, hid2, hid1, server,
-							   message, hid2, hid2, server], (err, rows)=> {
+							  [message, receipt2.link || hid2, hid1, server,
+							   message, receipt2.link || hid2, hid2, server], (err, rows)=> {
 					if(err) {
 						console.log(err);
 						res(false);
