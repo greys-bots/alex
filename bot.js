@@ -86,7 +86,8 @@ async function setup() {
         reprole 		BIGINT,
         delist_channel	BIGINT,
         starboard 		TEXT,
-        blacklist 		TEXT
+        blacklist 		TEXT,
+        feedback 		TEXT
     )`);
 
     bot.db.query(`CREATE TABLE IF NOT EXISTS reactroles (
@@ -145,7 +146,8 @@ async function setup() {
 		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
 		hid 		TEXT,
 		server_id 	TEXT,
-		message		TEXT
+		message		TEXT,
+		link 		TEXT
 	)`)
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS feedback (
