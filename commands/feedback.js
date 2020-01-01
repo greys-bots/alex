@@ -35,7 +35,7 @@ module.exports = {
 			anon = false;
 			embed.author = {name: `${msg.author.username}#${msg.author.discriminator}`}
 		}
-		var code = bot.utils.genCode(bot.CHARS);
+		var code = bot.utils.genCode(bot.chars);
 		embed.timestamp = new Date();
 		embed.footer = {text: `ID: ${code}`};
 		await msg.channel.createMessage({content: "Is this okay? (y/n)",embed: embed});
@@ -70,7 +70,7 @@ module.exports.subcommands.channel = {
 		else delete cfg.feedback.channel;
 		cfg.feedback.anon = cfg.feedback.anon != null ? cfg.feedback.anon : true;
 
-		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "feedback", cfg.feedback);
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, {feedback: cfg.feedback});
 		if(scc) msg.channel.createMessage("Channel updated!");
 		else msg.channel.createMessage("Something went wrong");
 	},
@@ -89,7 +89,7 @@ module.exports.subcommands.anon = {
 
 		cfg.feedback.anon = args[0] == 1 ? true : false;
 
-		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "feedback", cfg.feedback);
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, {feedback: cfg.feedback});
 		if(scc) msg.channel.createMessage("Anon setting updated!");
 		else msg.channel.createMessage("Something went wrong");
 	},
@@ -102,11 +102,12 @@ module.exports.subcommands.config = {
 	usage: ()=> [" - Views server's feedback config"],
 	execute: async (bot, msg, args) => {
 		var cfg = (await bot.utils.getConfig(bot, msg.guild.id)) || {feedback: {}};
+		if(!cfg.feedback) cfg.feedback = {};
 		var channel = cfg.feedback.channel ? msg.guild.channels.find(c => c.id == cfg.feedback.channel) : undefined;
 		msg.channel.createMessage({embed: {
 			title: "Feedback Config",
 			fields: [
-			{name: "Channel", value: channel ? channel.mention : "*(Not set)*"},
+			{name: "Channel", value: channel ? channel.mention : "*(not set)*"},
 			{name: "Anon", value: cfg.feedback.anon ? "True" : "False"}
 			]
 		}})
@@ -188,24 +189,24 @@ module.exports.subcommands.list = {
 				description: "Use `hh!feedback view [id]` to view a ticket individually",
 			}, 10);
 
-			msg.channel.createMessage(embeds[0]).then(message => {
-				if(!bot.pages) bot.pages = {};
-				bot.pages[message.id] = {
-					user: msg.author.id,
-					index: 0,
-					data: embeds
-				};
-				message.addReaction("\u2b05");
-				message.addReaction("\u27a1");
-				message.addReaction("\u23f9");
-				setTimeout(()=> {
-					if(!bot.pages[message.id]) return;
-					message.removeReaction("\u2b05");
-					message.removeReaction("\u27a1");
-					message.removeReaction("\u23f9");
-					delete bot.pages[msg.author.id];
-				}, 900000)
-			})
+			var message = await msg.channel.createMessage(embeds[0])
+			if(!bot.menus) bot.menus = {};
+			bot.menus[message.id] = {
+				user: msg.author.id,
+				index: 0,
+				data: embeds,
+				timeout: setTimeout(()=> {
+					if(!bot.menus[message.id]) return;
+					try {
+						message.removeReactions();
+					} catch(e) {
+						console.log(e);
+					}
+					delete bot.menus[message.id];
+				}, 900000),
+				execute: bot.utils.paginateEmbeds
+			};
+			["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
 		} else {
 			msg.channel.createMessage({embed: {
 				title: "Feedback",
@@ -282,24 +283,24 @@ module.exports.subcommands.find = {
 				description: "Use `hh!feedback view [id]` to view a ticket individually",
 			}, 10);
 
-			msg.channel.createMessage(embeds[0]).then(message => {
-				if(!bot.pages) bot.pages = {};
-				bot.pages[message.id] = {
-					user: msg.author.id,
-					index: 0,
-					data: embeds
-				};
-				message.addReaction("\u2b05");
-				message.addReaction("\u27a1");
-				message.addReaction("\u23f9");
-				setTimeout(()=> {
-					if(!bot.pages[message.id]) return;
-					message.removeReaction("\u2b05");
-					message.removeReaction("\u27a1");
-					message.removeReaction("\u23f9");
-					delete bot.pages[msg.author.id];
-				}, 900000)
-			})
+			var message = await msg.channel.createMessage(embeds[0])
+			if(!bot.menus) bot.menus = {};
+			bot.menus[message.id] = {
+				user: msg.author.id,
+				index: 0,
+				data: embeds,
+				timeout: setTimeout(()=> {
+					if(!bot.menus[message.id]) return;
+					try {
+						message.removeReactions();
+					} catch(e) {
+						console.log(e);
+					}
+					delete bot.menus[message.id];
+				}, 900000),
+				execute: bot.utils.paginateEmbeds
+			};
+			["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
 		} else {
 			msg.channel.createMessage({embed: {
 				title: "Search Results",

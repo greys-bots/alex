@@ -55,7 +55,8 @@ module.exports = {
 	},
 	subcommands: {},
 	alias: ["con","c"],
-	permissions: ["manageMessages"]
+	permissions: ["manageMessages"],
+	guildOnly: true
 }
 
 module.exports.subcommands.add = {
@@ -95,7 +96,8 @@ module.exports.subcommands.add = {
 			}
 		}))
 	},
-	permissions: ["manageMessages"]
+	permissions: ["manageMessages"],
+	guildOnly: true
 }
 
 module.exports.subcommands.remove = {
@@ -139,5 +141,6 @@ module.exports.subcommands.remove = {
 			msg.channel.createMessage('Something went wrong while updating post')
 		}
 	},
-	permissions: ["manageMessages"]
+	permissions: ["manageMessages"],
+	guildOnly: true
 }

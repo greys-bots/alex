@@ -1,11 +1,5 @@
 module.exports = {
-	cleanText: function(text){
-		if (typeof(text) === "string") {
-			return text.replace(/`/g, "`" + String.fromCharCode(8203)).replace(/@/g, "@" + String.fromCharCode(8203));
-		} else	{
-			return text;
-		}
-	},
+	//general utils
 	genEmbeds: async (bot, arr, genFunc, info = {}, fieldnum) => {
 		return new Promise(async res => {
 			var embeds = [];
@@ -84,57 +78,269 @@ module.exports = {
 		}
 		return codestring;
 	},
+	verifyUsers: async (bot, ids) => {
+		return new Promise(async res=>{
+			var results = {
+				pass: [],
+				fail: [],
+				info: []
+			};
+
+			for(var i = 0; i < ids.length; i++) {
+				try {
+					var user = bot.users.find(u => u.id == ids[i]) || await bot.getRESTUser(ids[i]);
+					if(user) {
+						results.pass.push(ids[i]);
+						results.info.push(user);
+					}
+				} catch(e) {
+					results.fail.push(ids[i]);
+				}
+			}
+			res(results);
+		})
+	},
+	paginateEmbeds: async function(bot, m, emoji) {
+		switch(emoji.name) {
+			case "\u2b05":
+				if(this.index == 0) {
+					this.index = this.data.length-1;
+				} else {
+					this.index -= 1;
+				}
+				await bot.editMessage(m.channel.id, m.id, this.data[this.index]);
+				await bot.removeMessageReaction(m.channel.id, m.id, emoji.name, this.user)
+				bot.menus[m.id] = this;
+				break;
+			case "\u27a1":
+				if(this.index == this.data.length-1) {
+					this.index = 0;
+				} else {
+					this.index += 1;
+				}
+				await bot.editMessage(m.channel.id, m.id, this.data[this.index]);
+				await bot.removeMessageReaction(m.channel.id, m.id, emoji.name, this.user)
+				bot.menus[m.id] = this;
+				break;
+			case "\u23f9":
+				await bot.deleteMessage(m.channel.id, m.id);
+				delete bot.menus[m.id];
+				break;
+		}
+	},
+
+	//config
+	getConfig: async (bot, id)=> {
+		return new Promise(res=>{
+			bot.db.query(`SELECT * FROM configs WHERE server_id=?`,[id], {
+				id: Number,
+		        server_id: String,
+		        banlog_channel: String,
+		        ban_message: String,
+		        reprole: String,
+		        delist_channel: String,
+		        starboard: val => val ? JSON.parse(val) : null,
+		        blacklist: val => val ? JSON.parse(val) : null,
+		        feedback: val => val ? JSON.parse(val) : null
+			}, (err,rows)=>{
+				if(err) {
+					console.log("config err")
+					console.log(err);
+					res(false);
+				} else {
+					res(rows[0]);
+				}
+			})
+		})
+	},
+	updateConfig: async function(bot, srv, data) {
+		return new Promise((res)=> {
+			bot.db.query(`SELECT * FROM configs WHERE server_id=?`,[srv], (err, rows)=> {
+				if(err) {
+					console.log(err);
+				} else {
+					if(!rows[0]) {
+						bot.db.query(`INSERT INTO configs 
+									 (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES 
+									 (?,?,?,?,?,?,?,?,?,?,?)`,
+									 [srv, data.banlog_channel || "", data.ban_message || "", data.reprole || "", data.delist_channel || "",
+									 data.starboard || {}, data.blacklist || [], data.feedback || {}])
+					} else {
+						bot.db.query(`UPDATE configs SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE server_id=?`,[...Object.values(data), srv], (err, rows)=> {
+							if(err) {
+								console.log(err);
+								res(false)
+							} else {
+								res(true)
+							}
+						})
+					}					
+				}
+			})
+		})
+	},
+	deleteConfig: async (bot, id) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM configs WHERE server_id = ?`, [id], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+			})
+		})
+	},
+
+	//servers
 	getServers: async (bot, host) => {
 		return new Promise((res)=>{
-			bot.db.query(`SELECT * FROM servers WHERE host_id=?`,[host],(err,rows)=>{
+			bot.db.query(`SELECT * FROM servers WHERE host_id=?`,[host], {
+				id: Number,
+				host_id: String,
+				server_id: String,
+				contact_id: String,
+				name: String,
+				description: String,
+				invite: String,
+				pic_url: String,
+				visibility: Boolean
+			}, (err,rows)=>{
 				if(err) {
-						console.log(err);
-						res(undefined)
-					} else {
-						res(rows);
+					console.log(err);
+					res(undefined)
+				} else {
+					if(!rows[0]) return res(undefined);
+
+					for(var i = 0; i < rows.length; i++) {
+						rows[i].guild = bot.guilds.find(g => g.id == rows[i].server_id);
 					}
+					res(rows);
+				}
 			})
 		})
 	},
 	getServer: async (bot, host, id) => {
 		return new Promise((res)=>{
-			bot.db.query(`SELECT * FROM servers WHERE host_id=? AND server_id=?`,[host, id],(err,rows)=>{
+			bot.db.query(`SELECT * FROM servers WHERE host_id=? AND server_id=?`,[host, id], {
+				id: Number,
+				host_id: String,
+				server_id: String,
+				contact_id: String,
+				name: String,
+				description: String,
+				invite: String,
+				pic_url: String,
+				visibility: Boolean
+			}, (err,rows)=>{
 				if(err) {
-						console.log(err);
-						res(undefined)
-					} else {
-						res(rows[0]);
-					}
+					console.log(err);
+					res(undefined)
+				} else {
+					if(!rows[0]) return res(undefined);
+
+					rows[0].guild = bot.guilds.find(g => g.id == id);
+					res(rows[0]);
+				}
+			})
+		})
+	},
+	getServerByID: async (bot, id) => {
+		return new Promise((res)=>{
+			bot.db.query(`SELECT * FROM servers WHERE server_id=?`,[id], {
+				id: Number,
+				host_id: String,
+				server_id: String,
+				contact_id: String,
+				name: String,
+				description: String,
+				invite: String,
+				pic_url: String,
+				visibility: Boolean
+			}, (err,rows)=>{
+				if(err) {
+					console.log(err);
+					res(undefined)
+				} else {
+					if(!rows[0]) return res(undefined);
+
+					rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
+					res(rows[0]);
+				}
 			})
 		})
 	},
 	getServerByRowID: async (bot, id) => {
 		return new Promise((res)=>{
-			bot.db.query(`SELECT * FROM servers WHERE id=?`,[id],(err,rows)=>{
+			bot.db.query(`SELECT * FROM servers WHERE id=?`,[id], {
+				id: Number,
+				host_id: String,
+				server_id: String,
+				contact_id: String,
+				name: String,
+				description: String,
+				invite: String,
+				pic_url: String,
+				visibility: Boolean
+			}, (err,rows)=>{
 				if(err) {
-						console.log(err);
-						res(undefined)
-					} else {
-						res(rows[0]);
-					}
+					console.log(err);
+					res(undefined)
+				} else {
+					rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
+					res(rows[0]);
+				}
 			})
 		})
 	},
 	getServersWithContact: async (bot, host, id) => {
 		return new Promise((res)=>{
-			bot.db.query(`SELECT * FROM servers WHERE host_id=? AND contact_id LIKE ?`,[host, "%"+id+"%"],(err,rows)=>{
+			bot.db.query(`SELECT * FROM servers WHERE host_id=? AND contact_id LIKE ?`,[host, "%"+id+"%"], {
+				id: Number,
+				host_id: String,
+				server_id: String,
+				contact_id: String,
+				name: String,
+				description: String,
+				invite: String,
+				pic_url: String,
+				visibility: Boolean
+			}, (err,rows)=>{
 				if(err) {
-						console.log(err);
-						res(undefined)
-					} else {
-						res(rows);
-					}
+					console.log(err);
+					res(undefined)
+				} else {
+					if(!rows[0]) return res(undefined);
+
+					rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
+					res(rows);
+				}
 			})
 		})
 	},
-	updateServer: async (bot, host, id, key, val)=> {
+	addServer: async (bot, host, server, name, invite, image) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO servers (host_id, server_id, name, invite, pic_url) VALUES (?,?,?,?,?)`, [host, server, name, invite, image], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else res(true);
+			});
+		})
+	},
+	updateHostedServer: async (bot, host, id, data)=> {
 		return new Promise(res=>{
-			bot.db.query(`UPDATE servers SET ?=? WHERE host_id=? AND server_id=?`, [key, val, host, id], (err, rows)=>{
+			bot.db.query(`UPDATE servers SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE host_id = ? AND server_id=?`, [...Object.values(data), host, id], (err, rows)=>{
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true);
+				}
+			});
+		})
+	},
+	updateServer: async (bot, id, data)=> {
+		return new Promise(res=>{
+			bot.db.query(`UPDATE servers SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE server_id=?`, [...Object.values(data), id], (err, rows)=>{
 				if(err) {
 					console.log(err);
 					res(false);
@@ -163,6 +369,48 @@ module.exports = {
 			})
 		})
 	},
+	deleteServers: async (bot, host) => {
+		return new Promise(res => {
+			bot.db.query('DELETE FROM servers WHERE host = ?',[host], async (err,rows)=>{
+				if(err) {
+					cosole.log(err);
+					res(false)
+				} else {
+					var scc = await bot.utils.deleteAllPosts(bot, host);
+					res(scc)
+				}
+			})
+		})
+	},
+	findServers: async (bot, host, name) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM servers WHERE host_id=? AND name LIKE ?`,[host, "%"+name+"%"], {
+				id: Number,
+				host_id: String,
+				server_id: String,
+				contact_id: String,
+				name: String,
+				description: String,
+				invite: String,
+				pic_url: String,
+				visibility: Boolean
+			}, (err, rows)=>{
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(!rows[0]) return res(undefined);
+
+					for(var i = 0; i < rows.length; i++) {
+						rows[i].guild = bot.guilds.find(g => g.id == rows[i].server_id);
+					}
+					res(rows);
+				}
+			})
+		})
+	},
+
+	//server posts
 	getAllPosts: async (bot, host) => {
 		return new Promise(async res => {
 			var posts = [];
@@ -195,6 +443,20 @@ module.exports = {
 			})
 		})
 	},
+	getPostsByServer: async (bot, id) => {
+		return new Promise(async res => {
+			var guild = await bot.utils.getServerByID(bot, id);
+			if(!guild) return res(undefined);
+			bot.db.query(`SELECT * FROM posts WHERE server_id = ?`,[guild.id], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows);
+				}
+			})
+		})
+	},
 	updatePosts: async (bot, host, id) => {
 		return new Promise(async res=> {
 			var guild = await bot.utils.getServer(bot, host, id)
@@ -203,42 +465,84 @@ module.exports = {
 				res(false);
 				return;
 			}
-			bot.db.query(`SELECT * FROM posts WHERE host_id=? AND server_id=?`,[host, guild.id], async (err, rows)=>{
+			var posts = await bot.utils.getPostsByServer(bot, id);
+			if(!posts || !posts[0]) res(true);
+			var dat = guild.contact_id == undefined || guild.contact_id == "" ? "" : await bot.utils.verifyUsers(bot, guild.contact_id.split(" "));
+			var contacts = dat.info ? dat.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n") : "(no contact provided)";
+			for(var i = 0; i < posts.length; i++) {
+				try {
+					await bot.editMessage(posts[i].channel_id, posts[i].message_id, {embed: {
+						title: guild.name || "(unnamed)",
+						description: guild.description || "(no description provided)",
+						fields: [
+							{name: "Contact", value: contacts},
+							{name: "Link", value: guild.invite ? guild.invite : "(no link provided)", inline: true},
+							{name: "Members", value: bot.guilds.find(g => g.id == guild.server_id) ? bot.guilds.find(g => g.id == guild.server_id).memberCount : "(unavailable)"}
+						],
+						thumbnail: {
+							url: guild.pic_url || ""
+						},
+						color: 3447003,
+						footer: {
+							text: `ID: ${guild.server_id}`
+						}
+					}})
+				} catch(e) {
+					console.log(e);
+					if(e.message.includes("Unknown Message")) await bot.utils.deletePost(bot, host, posts[i].message_id);
+				}
+				
+			}
+			res(true);
+		})
+	},
+	updatePostsByServer: async (bot, id) => {
+		return new Promise(async res=> {
+			var guild = await bot.utils.getServerByID(bot, id)
+			if(!guild) {
+				console.log('Guild not found')
+				res(false);
+				return;
+			}
+			var posts = await bot.utils.getPostsByServer(bot, id);
+			if(!posts || !posts[0]) res(true);
+			var dat = guild.contact_id == undefined || guild.contact_id == "" ? "" : await bot.utils.verifyUsers(bot, guild.contact_id.split(" "));
+			var contacts = dat.info ? dat.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n") : "(no contact provided)";
+			for(var i = 0; i < posts.length; i++) {
+				try {
+					await bot.editMessage(posts[i].channel_id, posts[i].message_id, {embed: {
+						title: guild.name || "(unnamed)",
+						description: guild.description || "(no description provided)",
+						fields: [
+							{name: "Contact", value: contacts},
+							{name: "Link", value: guild.invite ? guild.invite : "(no link provided)", inline: true},
+							{name: "Members", value: bot.guilds.find(g => g.id == guild.server_id) ? bot.guilds.find(g => g.id == guild.server_id).memberCount : "(unavailable)"}
+						],
+						thumbnail: {
+							url: guild.pic_url || ""
+						},
+						color: 3447003,
+						footer: {
+							text: `ID: ${guild.server_id}`
+						}
+					}})
+				} catch(e) {
+					console.log(e);
+					if(e.message.includes("Unknown Message")) await bot.utils.deletePost(bot, posts[i].host_id, posts[i].message_id);
+				}
+				
+			}
+			res(true);
+		})
+	},
+	deleteAllPosts: async (bot, host) => {
+		return new Promise(async res=> {
+			bot.db.query(`SELECT * FROM posts WHERE host_id=?`,[host], async (err, rows)=>{
 				if(err) {
 					console.log(err);
 					res(false);
 				} else {
-					if(!rows[0]) res(true);
-					await Promise.all(rows.map(async p => {
-						var dat = guild.contact_id == undefined || guild.contact_id == "" ? "" : await bot.utils.verifyUsers(bot, guild.contact_id.split(" "));
-						var contacts = dat.info ? dat.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n") : "(no contact provided)";
-
-						await bot.editMessage(p.channel_id, p.message_id, {embed: {
-							title: guild.name || "(unnamed)",
-							description: guild.description || "(no description provided)",
-							fields: [
-								{name: "Contact", value: contacts},
-								{name: "Link", value: guild.invite ? guild.invite : "(no link provided)"}
-							],
-							thumbnail: {
-								url: guild.pic_url || ""
-							},
-							color: 3447003,
-							footer: {
-								text: `ID: ${guild.server_id}`
-							}
-						}}).then(() => {
-							return new Promise(res2 => {setTimeout(()=>res2(1), 100)})
-						}).catch(e => {
-							console.log(e);
-							return new Promise(res2 => {setTimeout(()=>res2(0), 100)})
-						});
-					})).then(()=> {
-						res(true)
-					}).catch(e => {
-						console.log(e);
-						res(false);
-					})
+					res(true)
 				}
 			})
 		})
@@ -255,26 +559,23 @@ module.exports = {
 					console.log(err);
 					res(false);
 				} else {
-					await Promise.all(rows.map(async p => {
-						await bot.deleteMessage(p.channel_id, p.message_id).then(() => {
-							return new Promise(res2 => {setTimeout(()=>res2(1), 100)})
-						}).catch(e => {
+					for(var i = 0; i < rows.length; i++) {
+						try {
+							await bot.deleteMessage(rows[i].channel_id, rows[i].message_id)
+						} catch(e) {
 							console.log(e);
-							return new Promise(res2 => {setTimeout(()=>res2(0), 100)})
-						});
-					})).then(()=> {
-						res(true)
-					}).catch(e => {
-						console.log(e);
-						res(false);
-					})
+							return res(false);
+						}
+					}
+
+					res(true);
 				}
 			})
 		})
 	},
-	deletePost: async (bot, id) => {
+	deletePost: async (bot, host, id) => {
 		return new Promise(res => {
-			bot.db.query(`DELETE FROM posts WHERE message_id=?`,[id],(err, rows)=> {
+			bot.db.query(`DELETE FROM posts WHERE host_id = ? AND message_id=?`,[host, id],(err, rows)=> {
 				if(err) {
 					console.log(err);
 					res(false);
@@ -284,50 +585,8 @@ module.exports = {
 			})
 		})
 	},
-	getConfig: async (bot, id)=> {
-		return new Promise(res=>{
-			bot.db.query(`SELECT * FROM configs WHERE server_id=?`,[id], {
-				id: Number,
-		        server_id: String,
-		        banlog_channel: String,
-		        ban_message: String,
-		        reprole: String,
-		        delist_channel: String,
-		        starboard: JSON.parse,
-		        blacklist: JSON.parse,
-		        feedback: JSON.parse
-			}, (err,rows)=>{
-				if(err) {
-					console.log(err);
-					res(false);
-				} else {
-					res(rows[0]);
-				}
-			})
-		})
-	},
-	updateConfig: async function(bot,srv,key,val) {
-		return new Promise((res)=> {
-			bot.db.query(`SELECT * FROM configs WHERE server_id=?`,[srv], (err, rows)=> {
-				if(err) {
-					console.log(err);
-				} else {
-					if(!rows[0]) {
-						bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES (?,?,?,?,?,?,?,?)`,[srv, "", "", "", "", {}, [], {}]);
-					}
 
-					bot.db.query(`UPDATE configs SET ?=? WHERE server_id=?`,[key, val, srv], (err, rows)=> {
-						if(err) {
-							console.log(err);
-							res(false)
-						} else {
-							res(true)
-						}
-					})
-				}
-			})
-		})
-	},
+	//commands
 	getCustomCommands: async (bot, id) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM commands WHERE server_id=?`,[id],
@@ -378,6 +637,28 @@ module.exports = {
 			})
 		})
 	},
+	deleteCustomCommand: async (bot, server, name) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM commands WHERE server_id=? AND name=?`,[server, name], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+			})
+		})
+	},
+	deleteCustomCommands: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM commands WHERE server_id=?`,[server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+			})
+		})
+	},
+
+	//reactio roles
 	getReactionRoles: async (bot, id) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM reactroles WHERE server_id=?`,[id],(err, rows)=>{
@@ -406,16 +687,13 @@ module.exports = {
 				} else {
 					if(rows[0].roles) {
 						var roles = [];
-						await Promise.all(rows[0].roles.map((r,i) => {
-							return new Promise(res2 => {
-								bot.db.query(`SELECT * FROM reactroles WHERE id=?`,[r], (err, rls)=> {
-									roles[i] = rls[0]
-								});
-								setTimeout(()=> res2(''), 100)
-							})
-						})).then(()=> {
-							res(roles)
-						})
+						for(var i = 0; i < rows[0].roles.length; i++) {
+							bot.db.query(`SELECT * FROM reactroles WHERE id=?`,[rows[0].roles[i]], (err, rls)=> {
+								roles[i] = rls[0]
+							});
+						}
+
+						res(roles);
 					} else {
 						res(undefined);
 					}
@@ -427,44 +705,6 @@ module.exports = {
 	getReactionRoleByReaction: async (bot, id, emoji, postid) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM reactroles WHERE server_id=? AND emoji=? AND post_id=?`,[id, emoji, postid],(err, rows)=>{
-				if(err) {
-					console.log(err);
-					res(undefined);
-				} else {
-					res(rows[0]);
-				}
-			})
-		})
-	},
-	getReactionRolePosts: async (bot, id) => {
-		return new Promise(res => {
-			bot.db.query(`SELECT * FROM reactposts WHERE server_id = ?`,[id], {
-				id: Number,
-				server_id: String,
-				channel_id: String,
-				message_id: String,
-				roles: JSON.parse,
-				page: Number
-			}, (err, rows)=> {
-				if(err) {
-					console.log(err);
-					res(undefined);
-				} else {
-					res(rows)
-				}
-			})
-		})
-	},
-	getReactionRolePost: async (bot, id, postid) => {
-		return new Promise(res => {
-			bot.db.query(`SELECT * FROM reactposts WHERE server_id=? AND message_id=?`,[id, postid],{
-				id: Number,
-				server_id: String,
-				channel_id: String,
-				message_id: String,
-				roles: JSON.parse,
-				page: Number
-			},(err, rows)=>{
 				if(err) {
 					console.log(err);
 					res(undefined);
@@ -486,6 +726,18 @@ module.exports = {
 			})
 		})
 	},
+	deleteReactionRoles: async (bot, id) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE * FROM reactroles WHERE server_id = ?`, [id], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else res(true);
+			})
+		})
+	},
+
+	//reaction categories
 	getReactionCategories: async (bot, id) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM reactcategories WHERE server_id=?`,[id], {
@@ -525,6 +777,107 @@ module.exports = {
 			})
 		})
 	},
+	updateReactCategoryPosts: async (bot, id, msg, categoryid) => {
+		return new Promise(async res => {
+			var cat = await bot.utils.getReactionCategory(bot, id, categoryid);
+			if(!cat) return res(false);
+			if(!cat.posts || !cat.posts[0]) return res(true);
+			var roles = await bot.utils.getReactionRolesByCategory(bot, msg.guild.id, cat.hid);
+			if(!roles) return res(false);
+			if(roles.length == 0) {
+				for(var i = 0; i < cat.posts.length; i++) {
+					var pst = await bot.utils.getReactionRolePost(bot, id, cat.posts[i]);
+					var message;
+					if(!pst) continue;
+					try {
+						message = await bot.getMessage(pst.channel_id, pst.message_id);
+					} catch(e) {
+						console.log(e);
+						continue;
+					}
+
+					await message.delete();
+					bot.db.query(`DELETE FROM reactposts WHERE server_id = ? AND message_id=?`, [
+						message.guild.id,
+						message.id
+					], (err, rows)=> {
+						if(err) console.log(err);
+					})
+				}
+
+			} else if(roles.length <= 10) {
+				for(var i = 0; i < cat.posts.length; i++) {
+					var pst = await bot.utils.getReactionRolePost(bot, id, cat.posts[i]);
+					if(!pst) continue;
+					var message;
+					try {
+						message = await bot.getMessage(pst.channel_id, pst.message_id);
+					} catch(e) {
+						console.log(e);
+						continue;
+					}
+					
+					if(pst.page > 0) return await message.delete();
+
+					await bot.editMessage(message.channel.id, message.id, {embed: {
+						title: cat.name,
+						description: cat.description,
+						fields: roles.map(r => {
+							var rl = msg.guild.roles.find(x => x.id == r.role_id);
+							return {name: `${rl.name} (${r.emoji.includes(":") ? `<${r.emoji}>` : r.emoji})`, value: r.description || "*(no description provided)*"}
+						})
+					}})
+
+					var emoji = roles.map(r => r.emoji);
+					message.removeReactions();
+					emoji.forEach(rc => message.addReaction(rc));
+
+					bot.db.query(`UPDATE reactposts SET roles = ?, page=? WHERE server_id = ? AND message_id=?`,[
+						roles.map(r => {return {emoji: r.emoji, role_id: r.role_id}}),
+						0,
+						message.guild.id,
+						message.id
+					], (err, rows)=> {
+						if(err) console.log(err);
+					})
+				}
+			} else {
+				var posts = await bot.utils.genReactPosts(bot, roles, msg, {
+					title: cat.name,
+					description: cat.description
+				})
+				for(var i = 0; i < cat.posts.length; i++) {
+					var pst = await bot.utils.getReactionRolePost(bot, id, cat.posts[i]);
+					if(!pst) continue;
+					var message;
+					try {
+						message = await bot.getMessage(pst.channel_id, pst.message_id);
+					} catch(e) {
+						console.log(e);
+						continue;
+					}
+					
+					if(pst.page > 0) return await message.delete();
+
+					await bot.editMessage(message.channel.id, message.id, {embed: posts[pst.page].embed})
+
+					var emoji = posts[pst.page].emoji;
+					message.removeReactions();
+					emoji.forEach(async rc => message.addReaction(rc));
+
+					bot.db.query(`UPDATE reactposts SET roles = ? WHERE server_id = ? AND message_id=?`,[
+						posts[pst.page].roles,
+						message.guild.id,
+						message.id
+					], (err, rows)=> {
+						if(err) console.log(err);
+					})
+				}
+			}
+			
+			res(true);
+		})
+	},
 	deleteReactionCategory: async (bot, id, categoryid) => {
 		return new Promise(async res => {
 			var category = await bot.utils.getReactionCategory(bot, id, categoryid);
@@ -545,107 +898,68 @@ module.exports = {
 			res(true);
 		})
 	},
-	updateReactCategoryPosts: async (bot, id, msg, categoryid) => {
+	deleteReactionCategories: async (bot, id) => {
 		return new Promise(async res => {
-			var cat = await bot.utils.getReactionCategory(bot, id, categoryid);
-			if(!cat) return res(false);
-			if(!cat.posts || !cat.posts[0]) return res(true);
-			var roles = await bot.utils.getReactionRolesByCategory(bot, msg.guild.id, cat.hid);
-			if(!roles) return res(false);
-			if(roles.length == 0) {
-				await Promise.all(cat.posts.map(async p => {
-					var pst = await bot.utils.getReactionRolePost(bot, id, p);
-					if(!pst) return Promise.resolve("")
-					var message = await bot.getMessage(pst.channel_id, pst.message_id);
-					if(!message) return Promise.resolve("")
-					await message.delete();
-					bot.db.query(`DELETE FROM reactposts WHERE server_id = ? AND message_id=?`, [
-						message.guild.id,
-						message.id
-					], (err, rows)=> {
-						if(err) console.log(err);
-					})
-
-				}))
-			} else if(roles.length <= 10) {
-				await Promise.all(cat.posts.map(async p => {
-					var pst = await bot.utils.getReactionRolePost(bot, id, p);
-					if(!pst) return Promise.resolve("")
-					var message = await bot.getMessage(pst.channel_id, pst.message_id);
-					if(!message) return Promise.resolve("")
-					if(pst.page > 0) return await message.delete();
-					console.log(pst.page);
-
-					bot.editMessage(message.channel.id, message.id, {embed: {
-						title: cat.name,
-						description: cat.description,
-						fields: roles.map(r => {
-							var rl = msg.guild.roles.find(x => x.id == r.role_id);
-							return {name: `${rl.name} (${r.emoji.includes(":") ? `<${r.emoji}>` : r.emoji})`, value: r.description || "*(no description provided)*"}
-						})
-					}}).then(message => {	
-						var emoji = roles.map(r => r.emoji);
-						var oldreacts = Object.keys(message.reactions)
-										.filter(rr => message.reactions[rr].me)
-										.filter(rr => !emoji.includes(rr) && !emoji.includes(":"+rr));
-						emoji.forEach(rc => message.addReaction(rc));
-						oldreacts.forEach(rc => message.removeReaction(rc.replace(/^:/,"")));
-						if(roles.length > 10) {
-							message.addReaction("\u2b05");
-							message.addReaction("\u27a1");
-						}
-
-						bot.db.query(`UPDATE reactposts SET roles = ?, page=? WHERE server_id = ? AND message_id=?`,[
-							roles.map(r => {return {emoji: r.emoji, role_id: r.role_id}}),
-							0,
-							message.guild.id,
-							message.id
-						], (err, rows)=> {
-							if(err) console.log(err);
-						})
-					}).catch(e => {
-						console.log(e);
-						res(false)
-					})
-
-				}))
-			} else {
-				var posts = await bot.utils.genReactPosts(bot, roles, msg, {
-					title: cat.name,
-					description: cat.description
-				})
-				await Promise.all(cat.posts.map(async p => {
-					var pst = await bot.utils.getReactionRolePost(bot, id, p);
-					if(!pst) return Promise.resolve("");
-					var message = await bot.getMessage(pst.channel_id, pst.message_id);
-					if(!message) return Promise.resolve("");
-					bot.editMessage(message.channel.id, message.id, {embed: posts[pst.page].embed}).then(message => {	
-						var emoji = posts[pst.page].emoji;
-						var oldreacts = Object.keys(message.reactions)
-										.filter(rr => message.reactions[rr].me)
-										.filter(rr => !emoji.includes(rr) && !emoji.includes(":"+rr));
-						emoji.forEach(async rc => message.addReaction(rc));
-						oldreacts.forEach(rc => message.removeReaction(rc.replace(/^:/,"")));
-
-
-						bot.db.query(`UPDATE reactposts SET roles = ? WHERE server_id = ? AND message_id=?`,[
-							posts[pst.page].roles,
-							message.guild.id,
-							message.id
-						], (err, rows)=> {
-							if(err) console.log(err);
-						})
-					}).catch(e => {
-						console.log(e);
-						res(false)
-					})
-
-				}))
-			}
-			
-			res(true);
+			bot.db.query(`DELETE FROM reactcategories WHERE server_id=?`,[id], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+			});
 		})
 	},
+
+	//reaction role posts
+	getReactionRolePosts: async (bot, id) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM reactposts WHERE server_id = ?`,[id], {
+				id: Number,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				roles: JSON.parse,
+				page: Number
+			}, (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows)
+				}
+			})
+		})
+	},
+	getReactionRolePost: async (bot, id, postid) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM reactposts WHERE server_id=? AND message_id=?`,[id, postid],{
+				id: Number,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				roles: JSON.parse,
+				page: Number
+			},(err, rows)=>{
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows[0]);
+				}
+			})
+		})
+	},
+	deleteReactionRolePosts: async (bot, id) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE * FROM reactposts WHERE server_id = ?`, [id], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else res(true);
+			})
+		})
+	},
+
+	//other reaction utils
 	getHighestPage: async (bot, id, hid) => {
 		return new Promise(async res => {
 			var category = await bot.utils.getReactionCategory(bot, id, hid);
@@ -661,41 +975,17 @@ module.exports = {
 			})
 		})
 	},
-	verifyUsers: async (bot, ids) => {
-		return new Promise(async res=>{
-			var results = {
-				pass: [],
-				fail: [],
-				info: []
-			};
-			console.log(results)
-			await Promise.all(ids.map(async id => {
-				console.log(id)
-				var user;
-				try {
-					user = await bot.getRESTUser(id);
-					if(user) {
-						results.pass.push(id);
-						results.info.push(user);
-					}
-				} catch(e) {
-					results.fail.push(id);
-				}
-			})).then(()=> {
-				res(results);
-			})
-		})
-	},
+
+	//starboard
 	starMessage: async function(bot, msg, channel, data) {
 		var attach = [];
 		if(msg.attachments[0]) {
-			await Promise.all(msg.attachments.map(async (f,i) => {
-				var att = await bot.fetch(f.url);
-				attach.push({file: Buffer.from(await att.buffer()), name: f.filename});
-				return new Promise(res => {
-					setTimeout(()=> res(1), 100);
-				})
-			}))
+			for(var i = 0; i < msg.attachments.length; i++) {
+				var att = await bot.fetch(msg.attachments[i].url);
+				att = Buffer.from(await att.buffer());
+				if(att.length > 8000000) continue;
+				attach.push({file: att, name: msg.attachments[i].filename});
+			}
 		}
 		var embed = {
 			author: {
@@ -717,7 +1007,6 @@ module.exports = {
 				data.emoji
 			])
 		});
-
 	},
 	updateStarPost: async (bot, server, msg, data) => {
 		return new Promise((res) => {
@@ -765,11 +1054,30 @@ module.exports = {
 			})
 		})
 	},
+	deleteStarPosts: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM starboard WHERE server_id = ?`,[server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+			})
+		})
+	},
 
 	//bans
 	getRawBanLogs: async (bot, server) => {
 		return new Promise(res => {
-			bot.db.query(`SELECT * FROM banlogs WHERE server_id = ?`, [server], async (err, rows) => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE server_id = ?`, [server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
 				if(err) {
 					console.log(err);
 					res(undefined);
@@ -782,34 +1090,38 @@ module.exports = {
 	},
 	getBanLogs: async (bot, server) => {
 		return new Promise(res => {
-			bot.db.query(`SELECT * FROM banlogs WHERE server_id = ?`, [server], async (err, rows) => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE server_id = ?`, [server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
 				if(err) {
 					console.log(err);
 					res(undefined);
 				} else {
 					if(rows[0]) {
 						var logs = [];
-						await Promise.all(rows.map(async b => {
+						for(var i = 0; i < rows.length; i++) {
 							var message;
+
 							try {
-								message = await bot.getMessage(b.channel_id, b.message_id);
+								message = await bot.getMessage(rows[i].channel_id, rows[i].message_id);
 							} catch(e) {
 								console.log(e.stack);
-								message = undefined;
+								await bot.utils.deleteBanLog(bot, rows[i].hid, server);
+								continue;
 							}
 
-							if(message) {
-								b.embed = message.embeds[0];
-								logs.push(b);
-							} else {
-								await bot.utils.removeBanLog(bot, b.hid, server)
-							}
-
-							return Promise.resolve()
-						}))
+							rows[i].embed = message.embeds[0];
+							logs.push(rows[i]);
+						}
 
 						res(logs);
-
 					} else res(undefined)
 				}
 			})
@@ -817,7 +1129,16 @@ module.exports = {
 	},
 	getBanLog: async (bot, hid, server) => {
 		return new Promise(res => {
-			bot.db.query(`SELECT * FROM banlogs WHERE hid = ? AND server_id = ?`, [hid, server], async (err, rows) => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE hid = ? AND server_id = ?`, [hid, server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
 				if(err) {
 					console.log(err);
 					res(undefined);
@@ -826,7 +1147,7 @@ module.exports = {
 						var message = await bot.getMessage(rows[0].channel_id, rows[0].message_id);
 
 						if(message) rows[0].embed = message.embeds[0];
-						else await bot.utils.removeBanLog(bot, rows[0].hid, server);
+						else await bot.utils.deleteBanLog(bot, rows[0].hid, server);
 
 						res(rows[0]);
 
@@ -837,7 +1158,16 @@ module.exports = {
 	},
 	getBanLogByMessage: async (bot, server, channel, message) => {
 		return new Promise(res => {
-			bot.db.query(`SELECT * FROM banlogs WHERE server_id = ? AND channel_id = ? AND message_id = ?`, [server, channel, message], async (err, rows) => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE server_id = ? AND channel_id = ? AND message_id = ?`, [server, channel, message], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
 				if(err) {
 					console.log(err);
 					res(undefined);
@@ -848,7 +1178,7 @@ module.exports = {
 						if(message) rows[0].embed = message.embeds[0];
 						else {
 							rows[0] = "deleted";
-							await removeBanLog(bot, hid, server)
+							await deleteBanLog(bot, rows[0].hid, server)
 						}
 
 						res(rows[0]);
@@ -858,9 +1188,102 @@ module.exports = {
 			})
 		})
 	},
-	addBanLog: async (bot, hid, server, channel, message) => {
+	getRawBanLogByMessage: async (bot, server, channel, message) => {
 		return new Promise(res => {
-			bot.db.query(`INSERT INTO banlogs (hid, server_id, channel_id, message_id) VALUES (?, ?, ?, ?)`,[hid, server, channel, message], (err, rows) => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE server_id = ? AND channel_id = ? AND message_id = ?`, [server, channel, message], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows[0]);
+				}
+			})
+		})
+	},
+	getBanLogByUser: async (bot, server, user) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE server_id = ? AND users LIKE ?`, [server, `%"${user}"%`], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var message = await bot.getMessage(rows[0].channel_id, rows[0].message_id);
+
+						if(message) rows[0].embed = message.embeds[0];
+						else {
+							rows[0] = "deleted";
+							await deleteBanLog(bot, rows[0].hid, server)
+						}
+
+						res(rows[0]);
+
+					} else res(undefined)
+				}
+			})
+		})
+	},
+	getBanLogsByUser: async (bot, server, user) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM ban_logs WHERE server_id = ? AND users LIKE ?`, [server, `%"${user}"%`], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				users: (val) => val ? JSON.parse(val) : undefined,
+				reason: String,
+				timestamp: String
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var logs = [];
+						for(var i = 0; i < rows.length; i++) {
+							var message;
+
+							try {
+								message = await bot.getMessage(rows[i].channel_id, rows[i].message_id);
+							} catch(e) {
+								console.log(e.stack);
+								await bot.utils.deleteBanLog(bot, rows[i].hid, server);
+								continue;
+							}
+
+							rows[i].embed = message.embeds[0];
+							logs.push(rows[i]);
+						}
+
+						res(logs);
+
+					} else res(undefined)
+				}
+			})
+		})
+	},
+	addBanLog: async (bot, hid, server, channel, message, users, reason, timestamp) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO ban_logs (hid, server_id, channel_id, message_id, users, reason, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)`,[hid, server, channel, message, users, reason || "(no reason given)", timestamp || new Date()], (err, rows) => {
 				if(err) {
 					console.log(err);
 					res(false);
@@ -870,21 +1293,242 @@ module.exports = {
 			})
 		})
 	},
-	removeBanLog: async (bot, hid, server) => {
+	deleteBanLog: async (bot, hid, server) => {
 		return new Promise(res => {
-			bot.db.query(`DELETE FROM banlogs WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
+			bot.db.query(`DELETE FROM ban_logs WHERE hid = ? AND server_id = ?`, [hid, server], async (err, rows) => {
 				if(err) {
 					console.log(err);
 					res(false)
 				} else {
-					bot.db.query(`DELETE FROM receipts WHERE hid = ? AND server_id = ?`, [hid, server], (err, rows) => {
-						if(err) {
-							console.log(err);
-							res(false);
-						} else {
-							res(true)
+					var scc = await bot.utils.deleteReceipt(bot, hid, server);
+					res(scc);
+				}
+			})
+		})
+	},
+	deleteBanLogs: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM ban_logs server_id = ?`, [server], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					var scc = await bot.utils.deleteReceipts(bot, server);
+					res(scc);
+				}
+			})
+		})
+	},
+	scrubBanLogs: async (bot, server, user) => {
+		return new Promise(async res => {
+			var logs = await bot.utils.getBanLogsByUser(bot, server, user);
+			if(!logs || !logs[0]) return res(true);
+
+			for(var i = 0; i < logs.length; i++) {
+				if(logs[i].users.length > 1) {
+					logs[i].users = logs[i].users.filter(x => x != user);
+					await bot.utils.updateBanLog(bot, logs[i].hid, server, {users: logs[i].users});
+
+					var ind = logs[i].embed.fields[1].value.split("\n").indexOf(user);
+					if(ind > -1) {
+						var usernames = logs[i].embed.fields[0].value.split("\n");
+						usernames.splice(ind, 1);
+						logs[i].embed.fields[0].value = usernames.join("\n");
+					}
+					logs[i].embed.fields[1].value = logs[i].embed.fields[1].value.replace(new RegExp(`(?:\\n${user}|${user}\\n)`),"");
+					console.log(logs[i].embed);
+					try {
+						await bot.editMessage(logs[i].channel_id, logs[i].message_id, {embed: logs[i].embed});
+					} catch(e) {
+						console.log(e);
+						//not much we can really do about it
+					}
+				} else {
+					await bot.deleteMessage(logs[i].channel_id, logs[i].message_id)
+				}
+			}
+
+			res(true);
+		})
+	},
+	updateBanLog: async (bot, hid, server, data) => {
+		return new Promise(async res => {
+			bot.db.query(`UPDATE ban_logs SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE hid = ? AND server_id=?`,[...Object.values(data), hid, server], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					res(true)
+				}
+			})
+		})
+	},
+
+	//delists and denials
+	getRawListingLogs: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM listing_logs WHERE server_id = ?`, [server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				server_name: String,
+				reason: String,
+				timestamp: String,
+				type: Number
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) res(rows);
+					else res(undefined)
+				}
+			})
+		})
+	},
+	getListingLogs: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM listing_logs WHERE server_id = ?`, [server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				server_name: String,
+				reason: String,
+				timestamp: String,
+				type: Number
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var logs = [];
+						for(var i = 0; i < rows.length; i++) {
+							var message;
+
+							try {
+								message = await bot.getMessage(rows[i].channel_id, rows[i].message_id);
+							} catch(e) {
+								console.log(e.stack);
+								await bot.utils.deleteBanLog(bot, rows[i].hid, server);
+								continue;
+							}
+
+							rows[i].embed = message.embeds[0];
+							logs.push(rows[i]);
 						}
-					})
+
+						res(logs);
+					} else res(undefined)
+				}
+			})
+		})
+	},
+	getListingLog: async (bot, hid, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM listing_logs WHERE hid = ? AND server_id = ?`, [hid, server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				server_name: String,
+				reason: String,
+				timestamp: String,
+				type: Number
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						var message;
+
+						try {
+							message = await bot.getMessage(rows[0].channel_id, rows[0].message_id);
+						} catch(e) {
+							console.log(e.stack);
+							await bot.utils.deleteBanLog(bot, rows[0].hid, server);
+							return res(undefined);
+						}
+
+						rows[0].embed = message.embeds[0];
+						res(rows[0]);
+					} else res(undefined)
+				}
+			})
+		})
+	},
+	getRawListingLogByMessage: async (bot, server, channel, message) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM listing_logs WHERE server_id = ? AND channel_id = ? AND message_id = ?`, [server, channel, message], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				server_name: String,
+				reason: String,
+				timestamp: String,
+				type: Number
+			}, async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					res(rows[0]);
+				}
+			})
+		})
+	},
+	addListingLog: async (bot, hid, server, channel, message, name, reason, timestamp, type) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO listing_logs (hid, server_id, channel_id, message_id, server_name, reason, timestamp, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,[hid, server, channel, message, name, reason || "(no reason given)", timestamp || new Date(), type], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true)
+				}
+			})
+		})
+	},
+	deleteListingLog: async (bot, hid, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM listing_logs WHERE hid = ? AND server_id = ?`, [hid, server], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					res(true);
+				}
+			})
+		})
+	},
+	deleteListingLogs: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM listing_logs server_id = ?`, [server], async (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					res(true);
+				}
+			})
+		})
+	},
+	updateListingLog: async (bot, hid, server, data) => {
+		return new Promise(async res => {
+			bot.db.query(`UPDATE listing_logs SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE hid = ? AND server_id=?`,[...Object.values(data), hid, server], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					res(true)
 				}
 			})
 		})
@@ -1195,13 +1839,14 @@ module.exports = {
 		})
 	},
 
-	//support tickets
+	//ticket configs
 	getSupportConfig: async (bot, server) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM ticket_configs WHERE server_id=?`,[server],{
 				id: Number,
 				server_id: String,
-				category_id: String
+				category_id: String,
+				archives_id: String
 			}, (err, rows)=> {
 				if(err) {
 					console.log(err);
@@ -1214,7 +1859,7 @@ module.exports = {
 	},
 	createSupportConfig: async (bot, server, category, archives) => {
 		return new Promise(res => {
-			bot.db.query(`INSERT INTO ticket_configs (server_id, category_id) VALUES (?,?)`,[server, category, archives], (err, rows)=> {
+			bot.db.query(`INSERT INTO ticket_configs (server_id, category_id, archives_id) VALUES (?,?,?)`,[server, category, archives], (err, rows)=> {
 				if(err) {
 					console.log(err);
 					res(false);
@@ -1248,6 +1893,20 @@ module.exports = {
 			}
 		})
 	},
+	deleteSupportConfig: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM ticket_configs WHERE server_id = ?`,[server], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else {
+					res(true);
+				}
+			})
+		})
+	},
+
+	//tickets
 	getSupportTickets: async (bot, server) => {
 		return new Promise(res => {
 			bot.db.query(`SELECT * FROM tickets WHERE server_id=?`,[server],{
@@ -1269,11 +1928,11 @@ module.exports = {
 
 					await bot.asyncForEach(tickets, bot, null, null, async (bot, msg, args, ticket, ind) => {
 						var users = [];
-						await Promise.all(ticket.users.map(async u => {
-							var us = await bot.utils.fetchUser(bot, u);
+						for(var i = 0; i < ticket.users.length; i++) {
+							var us = await bot.utils.fetchUser(bot, ticket.users[i]);
 							users.push(us);
-							return Promise.resolve()
-						}))
+						}
+
 						tickets[ind].userids = tickets[ind].users;
 						tickets[ind].users = users;
 						var opener = await bot.utils.fetchUser(bot, ticket.opener);
@@ -1314,11 +1973,10 @@ module.exports = {
 					if(!ticket) return res(undefined);
 
 					var users = [];
-					await Promise.all(ticket.users.map(async u => {
-						var us = await bot.utils.fetchUser(bot, u);
+					for(var i = 0; i < ticket.users.length; i++) {
+						var us = await bot.utils.fetchUser(bot, ticket.users[i]);
 						users.push(us);
-						return Promise.resolve()
-					}))
+					}
 					ticket.userids = ticket.users;
 					ticket.users = users;
 					var opener = await bot.utils.fetchUser(bot, ticket.opener);
@@ -1341,7 +1999,7 @@ module.exports = {
 		return new Promise(async res => {
 			var cfg = await bot.utils.getSupportConfig(bot, server);
 			if(!cfg) return res({err: "No config registered; please run `hub!ticket config setup` first"});
-			var code = bot.utils.genCode(bot.CHARS);
+			var code = bot.utils.genCode(bot.chars);
 			var time = new Date();
 			try {
 				var channel = await bot.createChannel(server, `ticket-${code}`, 0, "", {
@@ -1402,6 +2060,16 @@ module.exports = {
 			})
 		})
 	},
+	deleteSupportTickets: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM tickets WHERE server_id = ?`,[server], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else res(true)
+			})
+		})
+	},
 	editSupportTicket: async (bot, server, ticket, key, val) => {
 		return new Promise(res => {
 			bot.db.query(`UPDATE tickets SET ?=? WHERE server_id = ? AND hid = ?`,[key, val, server, ticket], (err, rows)=> {
@@ -1412,6 +2080,8 @@ module.exports = {
 			})
 		})
 	},
+
+	//ticket posts
 	addTicketPost: async (bot, server, channel, message) => {
 		return new Promise(res => {
 			bot.db.query(`INSERT INTO ticket_posts (server_id, channel_id, message_id) VALUES (?,?,?)`,[server, channel, message], (err, rows) => {
@@ -1468,6 +2138,163 @@ module.exports = {
 			})
 		})
 	},
+	deleteTicketPosts: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM ticket_posts WHERE server_id = ?`,[server], (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false)
+				} else {
+					res(true)
+				}
+			})
+		})
+	},
+
+	//syncing
+	getSyncConfig: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM sync WHERE server_id = ?`,[server], {
+				id: Number,
+				server_id: String,
+				sync_id: String,
+				confirmed: Boolean,
+				syncable: Boolean,
+				sync_notifs: String,
+				ban_notifs: String,
+				enabled: Boolean
+			}, (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else res(rows[0])
+			})
+		})
+	},
+	updateSyncConfig: async (bot, server, data) => {
+		return new Promise(async res => {
+			var cfg = await bot.utils.getSyncConfig(bot, server);
+			if(!cfg) {
+				bot.db.query(`INSERT INTO sync 
+							 (server_id, sync_id, confirmed, syncable, sync_notifs, ban_notifs, enabled) VALUES 
+							 (?,?,?,?,?,?,?)`,
+							 [server, data.sync_id || "", data.confirmed || 0,  data.syncable || 0,
+							 data.sync_notifs || "", data.ban_notifs || "", data.enabled || 1], (err, rows)=> {
+					if(err) {
+						console.log(err);
+						res(false)
+					} else {
+						res(true)
+					}
+				}) 
+			} else {
+				bot.db.query(`UPDATE sync SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE server_id=?`,[...Object.values(data), server], (err, rows)=> {
+					if(err) {
+						console.log(err);
+						res(false)
+					} else {
+						res(true)
+					}
+				})
+			}
+		})
+	},
+	addSyncMenu: async (bot, server, channel, message, type, rserver, rchannel) => {
+		return new Promise(res => {
+			bot.db.query(`INSERT INTO sync_menus (server_id, channel_id, message_id, type, reply_guild, reply_channel)
+						  VALUES (?,?,?,?,?,?)`,
+						  [server, channel, message, type, rserver, rchannel],
+			(err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+		  })
+		})
+	},
+	getSyncMenu: async (bot, server, channel, message) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM sync_menus WHERE server_id = ? AND channel_id = ? AND message_id = ?`,[server, channel, message], {
+				id: Number,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				type: Number,
+				reply_guild: String,
+				reply_channel: String
+			}, (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else res(rows[0])
+			})
+		})
+	},
+	getSyncRequest: async (bot, server, requester) => {
+		var scfg = await bot.utils.getSyncConfig(bot, requester);
+		if(!scfg || !scfg.sync_id || scfg.sync_id != server) return Promise.resolve(undefined);
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM sync_menus WHERE server_id = ? AND reply_guild = ?`,[server, requester], {
+				id: Number,
+				server_id: String,
+				channel_id: String,
+				message_id: String,
+				type: Number,
+				reply_guild: String,
+				reply_channel: String
+			}, (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) res({channel: rows[0].channel_id, message: rows[0].message_id,
+									requester: rows[0].reply_guild, requester_channel: rows[0].reply_channel, confirmed: scfg.confirmed});
+					else res({requester: scfg.server_id, requester_channel: scfg.sync_notifs, confirmed: scfg.confirmed});
+				}
+			})
+		})
+	},
+	deleteSyncMenu: async (bot, server, channel, message) => {
+		return new Promise(res => {
+			bot.db.query(`DELETE FROM sync_menus WHERE server_id = ? AND channel_id = ? AND message_id = ?`,[server, channel, message], (err, rows) => {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true)
+			})
+		})
+	},
+	getSyncedServers: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`SELECT * FROM sync WHERE sync_id=? AND confirmed = ?`,[server, 1],async (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(undefined);
+				} else {
+					if(rows[0]) {
+						for(var i = 0; i < rows.length; i++) {
+							var guild = bot.guilds.find(g => g.id == rows[i].server_id);
+							if(guild) rows[i].guild = guild;
+							else rows[i] = "deleted";
+						}
+						rows = rows.filter(x => x!="deleted");
+						if(!rows || !rows[0]) res(undefined);
+						else res(rows);
+					} else res(undefined);
+				}
+			})
+		})
+	},
+	unsyncServers: async (bot, server) => {
+		return new Promise(res => {
+			bot.db.query(`UPDATE sync SET sync_id=?, confirmed = ? WHERE sync_id = ?`,["", 0, server],async (err, rows)=> {
+				if(err) {
+					console.log(err);
+					res(false);
+				} else res(true);
+			})
+		})
+	},
 
 	//import/export
 	getExportData: async (bot, server) => {
@@ -1501,4 +2328,29 @@ module.exports = {
 			});
 		})
 	},
+	deleteAllData: async (bot, server) => {
+		return new Promise(async res => {
+			try {
+				await bot.utils.deleteConfig(bot, server);
+				await bot.utils.deleteServers(bot, server);
+				await bot.utils.deleteReactionRoles(bot, server);
+				await bot.utils.deleteReactionCategories(bot, server);
+				await bot.utils.deleteReactionRolePosts(bot, server);
+				await bot.utils.deleteStarPosts(bot, server);
+				await bot.utils.deleteBanLogs(bot, server);
+				await bot.utils.deleteSupportConfig(bot, server);
+				await bot.utils.deleteTicketPosts(bot, server);
+				await bot.utils.deleteSupportTickets(bot, server);
+				await bot.utils.deleteCustomCommands(bot, server);
+			} catch(e) {
+				console.log(e);
+				return res(false);
+			}
+			res(true)
+		})
+	},
+	//WIP
+	// importData: async (bot, server) => {
+
+	// }
 }

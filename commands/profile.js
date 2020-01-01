@@ -18,5 +18,6 @@ module.exports = {
 			msg.channel.createMessage('User is not a contact for any servers.');
 		}
 	},
-	alias: ["prof", "p"]
+	alias: ["prof", "p"],
+	guildOnly: true
 }

@@ -129,7 +129,8 @@ module.exports.subcommands.add = {
 		else msg.channel.createMessage("Something went wrong");
 		// msg.channel.createMessage("This command is currently under construction. However, manual database editing can be used to create custom commands. USE WITH EXTREME CAUTION.")
 	},
-	permissions: ["manageGuild"]
+	permissions: ["manageGuild"],
+	guildOnly: true
 }
 
 module.exports.subcommands.delete = {
@@ -144,5 +145,6 @@ module.exports.subcommands.delete = {
 		var scc = await bot.utils.deleteCustomCommand(bot, msg.guild.id, args[0]);
 		if(scc) msg.channel.createMessage("Command deleted!");
 		else msg.channel.createMessage("Something went wrong");
-	}
+	},
+	guildOnly: true
 }

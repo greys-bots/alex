@@ -7,7 +7,6 @@ module.exports = {
 		if(!guild) return msg.channel.createMessage("That server does not exist.");
 
 		var dat = guild.contact_id == undefined || guild.contact_id == "" ? "" : await bot.utils.verifyUsers(bot, guild.contact_id.split(" "));
-
 		var contacts = dat.info ? dat.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n") : "(no contact provided)";
 
 		msg.channel.createMessage({embed: {
@@ -15,7 +14,8 @@ module.exports = {
 			description: guild.description || "(no description provided)",
 			fields: [
 				{name: "Contact", value: contacts},
-				{name: "Link", value: guild.invite ? guild.invite : "(no link provided)"}
+				{name: "Link", value: guild.invite ? guild.invite : "(no link provided)"},
+				{name: "Members", value: guild.guild ? guild.guild.memberCount : "(unavailable)"}
 			],
 			thumbnail: {
 				url: guild.pic_url || ""
@@ -26,5 +26,6 @@ module.exports = {
 			}
 		}})
 	},
-	permissions: ["manageMessages"]
+	permissions: ["manageMessages"],
+	guildOnly: true
 }

@@ -23,7 +23,8 @@ module.exports = {
 	},
 	alias: ['reactcategories', 'rc'],
 	permissions: ["manageRoles"],
-	subcommands: {}
+	subcommands: {},
+	guildOnly: true
 }
 
 module.exports.subcommands.create = {
@@ -31,7 +32,7 @@ module.exports.subcommands.create = {
 	usage: ()=> [" [name] (new line) [description] - Creates a new category with the given name and description (NOTE: description needs to be on new line)"],
 	execute: async (bot, msg, args)=> {
 		var nargs = args.join(" ").split("\n");
-		var code = bot.utils.genCode(bot.CHARS);
+		var code = bot.utils.genCode(bot.chars);
 		bot.db.query(`INSERT INTO reactcategories (hid, server_id, name, description, roles, posts) VALUES (?,?,?,?,?,?)`,[
 			code,
 			msg.guild.id,
@@ -48,7 +49,8 @@ module.exports.subcommands.create = {
 			}
 		})
 	},
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.delete = {
@@ -61,7 +63,8 @@ module.exports.subcommands.delete = {
 		await bot.utils.deleteReactionCategory(bot, msg.guild.id, args[0]);
 		msg.channel.createMessage("Category deleted!");
 	},
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.name = {
@@ -82,7 +85,8 @@ module.exports.subcommands.name = {
 		})
 	},
 	alias: ["describe", "desc"],
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.description = {
@@ -103,7 +107,8 @@ module.exports.subcommands.description = {
 		})
 	},
 	alias: ["describe", "desc"],
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.add = {
@@ -175,7 +180,8 @@ module.exports.subcommands.add = {
 		
 		
 	},
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.remove = {
@@ -231,7 +237,8 @@ module.exports.subcommands.remove = {
 
 		})
 	},
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.post = {
@@ -305,7 +312,8 @@ module.exports.subcommands.post = {
 		}
 		
 	},
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }
 
 module.exports.subcommands.info = {
@@ -342,5 +350,6 @@ module.exports.subcommands.info = {
 			})
 		}
 	},
-	permissions: ["manageRoles"]
+	permissions: ["manageRoles"],
+	guildOnly: true
 }

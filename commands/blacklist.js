@@ -17,24 +17,24 @@ module.exports = {
 					title: "Blacklisted Users"
 				}, 20);
 
-				msg.channel.createMessage(embeds[0]).then(message => {
-					if(!bot.pages) bot.pages = {};
-					bot.pages[message.id] = {
-						user: msg.author.id,
-						index: 0,
-						data: embeds
-					};
-					message.addReaction("\u2b05");
-					message.addReaction("\u27a1");
-					message.addReaction("\u23f9");
-					setTimeout(()=> {
-						if(!bot.pages[message.id]) return;
-						message.removeReaction("\u2b05");
-						message.removeReaction("\u27a1");
-						message.removeReaction("\u23f9");
-						delete bot.pages[msg.author.id];
-					}, 900000)
-				})
+				var message = await msg.channel.createMessage(embeds[0])
+				if(!bot.menus) bot.menus = {};
+				bot.menus[message.id] = {
+					user: msg.author.id,
+					index: 0,
+					data: embeds,
+					timeout: setTimeout(()=> {
+						if(!bot.menus[message.id]) return;
+						try {
+							message.removeReactions();
+						} catch(e) {
+							console.log(e);
+						}
+						delete bot.menus[message.id];
+					}, 900000),
+					execute: bot.utils.paginateEmbeds
+				};
+				["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
 			} else {
 				msg.channel.createMessage({embed: {
 					title: "Blacklisted Users",
@@ -47,13 +47,14 @@ module.exports = {
 
 		if(users.fail.length > 0) {
 			cfg.blacklist = cfg.blacklist.filter(x => !users.fail.includes(x));
-			var scc = await bot.utils.updateConfig(bot, msg.guild.id, "blacklist", cfg.blacklist)
+			var scc = await bot.utils.updateConfig(bot, msg.guild.id, {blacklist: cfg.blacklist})
 			if(!scc) msg.channel.createMessage("Something went wrong while removing invalid users from the blacklist");
 			else msg.channel.createMessage("Successfully removed invalid users from the blacklist")
 		}
 	},
 	permissions: ["manageMessages"],
-	subcommands: {}
+	subcommands: {},
+	guildOnly: true
 }
 
 module.exports.subcommands.add = {
@@ -65,15 +66,11 @@ module.exports.subcommands.add = {
 		if(!cfg) cfg = {blacklist: []};
 		if(!cfg.blacklist) cfg.blacklist = [];
 
-		args = args.join(" ").split(/\s+/g);
-
-		var ids = args.filter(x => !cfg.blacklist.includes(x));
-		var aa = args.filter(x => cfg.blacklist.includes(x));
+		var ids = args.join(" ").split(/\s+/g);
 
 		var users = await bot.utils.verifyUsers(bot, ids);
-		users.fail = users.fail.concat(aa.map(u => u+" - already blacklisted"));
 
-		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "blacklist", cfg.blacklist.concat(users.pass))
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, {blacklist: cfg.blacklist.concat(users.pass)})
 		if(!scc) return msg.channel.createMessage("Something went wrong");
 
 		if(users.pass.length > 0) {
@@ -84,12 +81,10 @@ module.exports.subcommands.add = {
 				{name: "Users Not Added", value: users.fail.length > 0 ? users.fail.join("\n") : "None"}
 				]
 			}})
-		} else {
-			if(args.length == aa.length) msg.channel.createMessage(`User${ids.length > 1 ? "s" : ""} provided ${ids.length > 1 ? "are" : "is"} invalid: already added`);
-			else msg.channel.createMessage(`User${ids.length > 1 ? "s" : ""} provided ${ids.length > 1 ? "are" : "is"} invalid: not found`);
-		}
+		} else return msg.channel.createMessage(`User${ids.length > 0 ? "s" : ""} provided are invalid`);
 
-	}
+	},
+	guildOnly: true
 }
 
 module.exports.subcommands.remove = {
@@ -102,8 +97,9 @@ module.exports.subcommands.remove = {
 		
 		var ids = args.join(" ").split(/\s+/g);
 
-		var scc = await bot.utils.updateConfig(bot, msg.guild.id, "blacklist", cfg.blacklist.filter(x => !ids.includes(x)));
+		var scc = await bot.utils.updateConfig(bot, msg.guild.id, {blacklist: cfg.blacklist.filter(x => !ids.includes(x))});
 		if(!scc) msg.channel.createMessage("Something went wrong");
-		else msg.channel.createMessage(`User${ids.length > 1 ? "s" : ""} removed from blacklist`);
-	}
+		else msg.channel.createMessage("Users removed from blacklist");
+	},
+	guildOnly: true
 }

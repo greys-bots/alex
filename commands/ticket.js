@@ -1,15 +1,15 @@
 module.exports = {
 	help: ()=> "Manage server support tickets",
 	usage: ()=> [" - List open tickets",
-				 " post [channel] - Post the ticket starter message to a channel. Channel can be a #mention, an ID, or the channel-name",
-				 " bind [channel] [messageID] - Bind ticket reacts to a specific message. Channel can be a #mention, an ID, or the channel-name",
-				 " unbind [channel] [messageID] - Unbind ticket reacts from a specific message. Channel can be a #mention, and ID, or the channel-name",
-				 " add <hid> [user] [user] ... - Add users to a ticket. Users can be @ mentions or IDs. Up to 10 users can be added to a ticket (others can be manually added via permissions)",
-				 " remove <hid> [user] [user] ... - Remove users from a ticket. Users can be @ mentions or IDs",
+				 " post [channel] - Post the ticket starter message to a channel",
+				 " bind [channel] [messageID] - Bind ticket reacts to a specific message",
+				 " unbind [channel] [messageID] - Unbind ticket reacts from a specific message",
+				 " add <hid> [user] [user] ... - Add users to a ticket",
+				 " remove <hid> [user] [user] ... - Remove users from a ticket",
 				 " find [userID] - Find tickets started by the given user",
-				 " archive <hid> - Archive a ticket (sends text transcript to command user and deletes channel). NOTE: Does NOT save images. If no hid is given, attempts to archive the current channel's ticket",
+				 " archive <hid> - Archive a ticket (sends text transcript to command user and deletes channel)",
 				 " delete [hid] - Delete a ticket. NOTE: Does not archive it automatically; use this if you don't plan on archiving it",
-				 " config - Configure the ticket system. Use `hub!help ticket config` for more info"],
+				 " config - Configure the ticket system"],
 	desc: ()=> "Before using this, you should run `hub!ticket config`. Use `hub!ticket post [channel]` or `hub!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
 	execute: async (bot, msg, args) => {
 		var tickets = await bot.utils.getSupportTickets(bot, msg.guild.id);
@@ -30,24 +30,24 @@ module.exports = {
 				description: `Total tickets: ${tickets.length}`
 			});
 			
-			msg.channel.createMessage(embeds[0]).then(message => {
-				if(!bot.pages) bot.pages = {};
-				bot.pages[message.id] = {
-					user: msg.author.id,
-					index: 0,
-					data: embeds
-				};
-				message.addReaction("\u2b05");
-				message.addReaction("\u27a1");
-				message.addReaction("\u23f9");
-				setTimeout(()=> {
-					if(!bot.pages[message.id]) return;
-					message.removeReaction("\u2b05");
-					message.removeReaction("\u27a1");
-					message.removeReaction("\u23f9");
-					delete bot.pages[msg.author.id];
-				}, 900000)
-			})
+			var message = await msg.channel.createMessage(embeds[0])
+			if(!bot.menus) bot.menus = {};
+			bot.menus[message.id] = {
+				user: msg.author.id,
+				index: 0,
+				data: embeds,
+				timeout: setTimeout(()=> {
+					if(!bot.menus[message.id]) return;
+					try {
+						message.removeReactions();
+					} catch(e) {
+						console.log(e);
+					}
+					delete bot.menus[message.id];
+				}, 900000),
+				execute: bot.utils.paginateEmbeds
+			};
+			["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
 		} else {
 			msg.channel.createMessage({embed: {
 				title: "Server Support Tickets",
@@ -142,7 +142,7 @@ module.exports.subcommands.config = {
 		await msg.channel.createMessage("Enter the channel that archived tickets should be sent to. This can be the channel name, #mention, or ID. You have 1 minute to do this\nNOTE: This is not required. Type `skip` to skip it, and archives will be sent to your DMs instead");;
 		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
 		if(!resp[0]) return msg.channel.createMessage("Action cancelled: timed out");
-		if(resp[0].content.toLowerCase() != "skip") archives = await msg.guild.channels.find(c => (c.id == resp[0].content || c.name.toLowerCase() == resp[0].content.replace(/<#>/g,"").toLowerCase()) && c.type == 0);
+		if(resp[0].content.toLowerCase() != "skip") archives = await msg.guild.channels.find(c => (c.id == resp[0].content.replace(/<#>/g,"") || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 0);
 		if(!archives && resp[0].toLowerCase() != "skip") return msg.channel.createMessage("Action cancelled: category not found");
 
 		var scc;

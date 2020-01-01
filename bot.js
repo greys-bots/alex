@@ -10,7 +10,7 @@ bot.db		= dblite('data.sqlite',"-header");
 
 bot.utils = require('./utilities')
 
-bot.CHARS = process.env.CHARS;
+bot.chars = process.env.CHARS;
 bot.prefix = process.env.PREFIX;
 bot.owner = process.env.OWNER;
 
@@ -33,6 +33,10 @@ bot.customActions = [
 bot.banVars = {
 	"$REASON": "${reason}",
 	"$SERVER.NAME": "${msg.guild.name}"
+}
+
+bot.logVars = {
+	"$SERVER.NAME": '${guild.name || "(no name)"}'
 }
 
 bot.status = 0;
@@ -59,15 +63,60 @@ const updateStatus = function(){
 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
 async function setup() {
-	bot.db.query(`CREATE TABLE IF NOT EXISTS servers (
-		id         	INTEGER PRIMARY KEY AUTOINCREMENT,
-		host_id 	BIGINT,
-        server_id   BIGINT,
-        contact_id  TEXT,
-        name        TEXT,
-        description TEXT,
-        invite		TEXT,
-        pic_url     TEXT
+	//database schema
+	//FINALLY alphabetized
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS ban_logs (
+		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid 		TEXT,
+		server_id 	TEXT,
+		channel_id 	TEXT,
+		message_id 	TEXT,
+		users 		TEXT,
+		reason 		TEXT,
+		timestamp 	TEXT
+	)`);
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS commands (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		server_id 	BIGINT,
+		name 		TEXT,
+		actions 	TEXT,
+		target 		TEXT,
+		del 		INTEGER
+	)`);
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS configs (
+    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id   	BIGINT,
+        banlog_channel	BIGINT,
+        ban_message 	TEXT,
+        reprole 		BIGINT,
+        delist_channel	BIGINT,
+        starboard 		TEXT,
+        blacklist 		TEXT,
+        feedback 		TEXT
+    )`);
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS feedback (
+		id			INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid			TEXT,
+		server_id	TEXT,
+		sender_id 	TEXT,
+		message 	TEXT,
+		anon 		INTEGER
+	)`);
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS listing_logs (
+		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid 			TEXT,
+		server_id 		TEXT,
+		channel_id 		TEXT,
+		message_id 		TEXT,
+		server_name 	TEXT,
+		reason 			TEXT,
+		timestamp 		TEXT,
+		type 			INTEGER
 	)`);
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS posts (
@@ -76,26 +125,6 @@ async function setup() {
         server_id   BIGINT,
         channel_id  BIGINT,
         message_id  BIGINT
-    )`);
-
-    bot.db.query(`CREATE TABLE IF NOT EXISTS configs (
-    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
-        server_id   	BIGINT,
-        banlog_channel	BIGINT,
-        ban_message		TEXT,
-        reprole 		BIGINT,
-        delist_channel	BIGINT,
-        starboard 		TEXT,
-        blacklist 		TEXT,
-        feedback 		TEXT
-    )`);
-
-    bot.db.query(`CREATE TABLE IF NOT EXISTS reactroles (
-    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
-    	server_id		BIGINT,
-    	role_id 		BIGINT,
-    	emoji 			TEXT,
-    	description 	TEXT
     )`);
 
     bot.db.query(`CREATE TABLE IF NOT EXISTS reactcategories (
@@ -108,6 +137,14 @@ async function setup() {
     	posts 			TEXT
     )`);
 
+    bot.db.query(`CREATE TABLE IF NOT EXISTS reactroles (
+    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+    	server_id		BIGINT,
+    	role_id 		BIGINT,
+    	emoji 			TEXT,
+    	description 	TEXT
+    )`);
+
     bot.db.query(`CREATE TABLE IF NOT EXISTS reactposts (
 		id			INTEGER PRIMARY KEY AUTOINCREMENT,
 		server_id	TEXT,
@@ -116,14 +153,25 @@ async function setup() {
 		roles		TEXT
 	)`);
 
-	bot.db.query(`CREATE TABLE IF NOT EXISTS commands (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		server_id 	BIGINT,
-		name 		TEXT,
-		actions 	TEXT,
-		target 		TEXT,
-		del 		INTEGER
-	)`)
+	bot.db.query(`CREATE TABLE IF NOT EXISTS receipts (
+		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
+		hid 		TEXT,
+		server_id 	TEXT,
+		message		TEXT,
+		link		TEXT
+	)`);
+
+	bot.db.query(`CREATE TABLE IF NOT EXISTS servers(
+		id         	INTEGER PRIMARY KEY AUTOINCREMENT,
+		host_id 	BIGINT,
+        server_id   BIGINT,
+        contact_id  TEXT,
+        name        TEXT,
+        description TEXT,
+        invite		TEXT,
+        pic_url     TEXT,
+        visibility  INTEGER
+	)`);
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS starboard (
 		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,31 +180,27 @@ async function setup() {
 		message_id 	BIGINT,
 		original_id BIGINT,
 		emoji 		TEXT
-	)`) //emoji is to keep track of posts from multiple boards
+	)`);
 
-	bot.db.query(`CREATE TABLE IF NOT EXISTS banlogs (
-		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
-		hid 		TEXT,
-		server_id 	TEXT,
-		channel_id 	TEXT,
-		message_id 	TEXT
-	)`)
+	bot.db.query(`CREATE TABLE IF NOT EXISTS sync (
+		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		server_id 		TEXT,
+		sync_id 		TEXT,
+		confirmed 		INTEGER,
+		syncable 		INTEGER,
+		sync_notifs 	TEXT,
+		ban_notifs 		TEXT,
+		enabled 		INTEGER
+	)`);
 
-	bot.db.query(`CREATE TABLE IF NOT EXISTS receipts (
-		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
-		hid 		TEXT,
-		server_id 	TEXT,
-		message		TEXT,
-		link 		TEXT
-	)`)
-
-	bot.db.query(`CREATE TABLE IF NOT EXISTS feedback (
-		id			INTEGER PRIMARY KEY AUTOINCREMENT,
-		hid			TEXT,
-		server_id	TEXT,
-		sender_id 	TEXT,
-		message 	TEXT,
-		anon 		INTEGER
+	bot.db.query(`CREATE TABLE IF NOT EXISTS sync_menus (
+		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		server_id 		TEXT,
+		channel_id 		TEXT,
+		message_id 		TEXT,
+		type 			INTEGER,
+		reply_guild 	TEXT,
+		reply_channel 	TEXT
 	)`);
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS ticket_configs (
@@ -164,14 +208,14 @@ async function setup() {
 		server_id	TEXT,
 		category_id	TEXT,
 		archives_id TEXT
-	)`)
+	)`);
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS ticket_posts (
 		id			INTEGER PRIMARY KEY AUTOINCREMENT,
 		server_id	TEXT,
 		channel_id	TEXT,
 		message_id	TEXT
-	)`)
+	)`);
 
 	bot.db.query(`CREATE TABLE IF NOT EXISTS tickets (
 		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -182,8 +226,9 @@ async function setup() {
 		opener 			TEXT,
 		users 			TEXT,
 		timestamp 		TEXT
-	)`)
+	)`);
 
+	//command loading
 	var files = fs.readdirSync("./commands");
 	await Promise.all(files.map(f => {
 		bot.commands[f.slice(0,-3)] = require("./commands/"+f);
@@ -243,6 +288,7 @@ bot.parseCommand = async function(bot, msg, args, command) {
 bot.parseCustomCommand = async function(bot, msg, args) {
 	return new Promise(async res => {
 		if(!args || !args[0]) return res(undefined);
+		if(!msg.guild) return res(undefined);
 		var name = args.shift();
 		var cmd = await bot.utils.getCustomCommand(bot, msg.guild.id, name);
 		if(!cmd) return res(undefined);
@@ -250,7 +296,6 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 		cmd.newActions = [];
 
 		cmd.actions.forEach(action => {
-			console.log(cmd.target);
 			if(cmd.target == "member") {
 				switch(action.type) {
 					case "if":
@@ -380,7 +425,6 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 						break;
 				}
 			}
-			
 		})
 
 		cmd.execute = async (bot, msg, args, cmd) => {
@@ -406,8 +450,6 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 				}, 2000)
 				
 			}
-
-			console.log(msgs);
 			
 		}
 
@@ -428,17 +470,18 @@ bot.commands.help = {
 			if(dat) {
 				cmd = dat[0];
 				names = dat[2].split(" ");
+				var fields = [
+					{name: "**Usage**", value: `${cmd.usage().map(c => `**${bot.prefix + names.join(" ")}**${c}`).join("\n")}`},
+					{name: "**Aliases**", value: `${cmd.alias ? cmd.alias.join(", ") : "(none)"}`},
+					{name: "**Subcommands**", value: `${cmd.subcommands ?
+							Object.keys(cmd.subcommands).map(sc => `**${bot.prefix}${dat[2]} ${sc}** - ${cmd.subcommands[sc].help()}`).join("\n") : 
+							"(none)"}`}
+				];
+				if(cmd.desc) fields.push({name: "**Extra**", value: `${cmd.desc()}`});
 				embed = {
 					title: `Help | ${names.join(" - ").toLowerCase()}`,
-					description: [
-						`${cmd.help()}\n\n`,
-						`**Usage**\n${cmd.usage().map(c => `**${bot.prefix + names.join(" ")}**${c}`).join("\n")}\n\n`,
-						`**Aliases:** ${cmd.alias ? cmd.alias.join(", ") : "(none)"}\n\n`,
-						`**Subcommands**\n${cmd.subcommands ?
-							Object.keys(cmd.subcommands).map(sc => `**${bot.prefix}${sc}** - ${cmd.subcommands[sc].help()}`).join("\n") : 
-							"(none)"}`,
-						(cmd.desc ? "\n\n"+cmd.desc() : "")
-					].join(""),
+					description: `${cmd.help()}\n\n`,
+					fields: fields,
 					footer: {
 						icon_url: bot.user.avatarURL,
 						text: "Arguments like [this] are required, arguments like <this> are optional."
@@ -496,39 +539,18 @@ bot.on("messageCreate",async (msg)=>{
 
 bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 	if(bot.user.id == user) return;
-	if(!msg.channel.guild) return;
-	if(bot.pages && bot.pages[msg.id] && bot.pages[msg.id].user == user) {
-		if(emoji.name == "\u2b05") {
-			if(bot.pages[msg.id].index == 0) {
-				bot.pages[msg.id].index = bot.pages[msg.id].data.length-1;
-			} else {
-				bot.pages[msg.id].index -= 1;
-			}
-			bot.editMessage(msg.channel.id, msg.id, bot.pages[msg.id].data[bot.pages[msg.id].index]);
-			try {
-				bot.removeMessageReaction(msg.channel.id, msg.id, emoji.id ? `${emoji.name}:${emoji.id}` : emoji.name, user);
-			} catch(e) {
-				console.log(e);
-				msg.channel.createMessage("I can't remove reactions :(");
-			}
-		} else if(emoji.name == "\u27a1") {
-			if(bot.pages[msg.id].index == bot.pages[msg.id].data.length-1) {
-				bot.pages[msg.id].index = 0;
-			} else {
-				bot.pages[msg.id].index += 1;
-			}
-			bot.editMessage(msg.channel.id, msg.id, bot.pages[msg.id].data[bot.pages[msg.id].index]);
-			try {
-				bot.removeMessageReaction(msg.channel.id, msg.id, emoji.id ? `${emoji.name}:${emoji.id}` : emoji.name, user);
-			} catch(e) {
-				console.log(e);
-				msg.channel.createMessage("I can't remove reactions :(");
-			}
-		} else if(emoji.name == "\u23f9") {
-			bot.deleteMessage(msg.channel.id, msg.id);
-			delete bot.pages[msg.id];
+
+	if(bot.menus && bot.menus[msg.id] && bot.menus[msg.id].user == user) {
+		try {
+			await bot.menus[msg.id].execute(bot, msg, emoji);
+		} catch(e) {
+			console.log(e);
+			writeLog(e);
+			msg.channel.createMessage("Something went wrong: "+e.message);
 		}
 	}
+
+	if(!msg.channel.guild) return;
 
 	var cfg = await bot.utils.getConfig(bot, msg.channel.guild.id);
 	if(cfg && cfg.blacklist && cfg.blacklist.includes(user)) return;
@@ -541,7 +563,6 @@ bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 			var sbpost = await bot.utils.getStarPost(bot, msg.channel.guild.id, msg.id, em);
 			var message = await bot.getMessage(msg.channel.id, msg.id);
 			if(!sbpost) {
-				console.log(em);
 				var chan = cf.channel;
 				var member = msg.channel.guild.members.find(m => m.id == user);
 				var tolerance = cf.tolerance ? cf.tolerance : (cfg.starboard.tolerance || 2);
@@ -554,8 +575,109 @@ bot.on("messageReactionAdd", async (msg, emoji, user)=>{
 		}
 	}
 
+	var message;
+	try {
+		message = await bot.getMessage(msg.channel.id, msg.id);
+	} catch(e) {
+		if(!(e.stack.includes("Unknown Message") && emoji.name == "\u23f9")) console.log(e);
+		return;
+	}
+
+	var smenu = await bot.utils.getSyncMenu(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+	if(smenu) {
+		if(!["✅", "❌"].includes(emoji.name)) return;
+		var request = await bot.utils.getSyncRequest(bot, msg.channel.guild.id, smenu.reply_guild);
+		if(!request) return;
+		if(message) var embed = message.embeds[0];
+		var member = await bot.utils.fetchUser(bot, user);
+		switch(emoji.name) {
+			case "✅":
+				if(request.confirmed) {
+					try {
+						await message.removeReaction("✅", user);
+					} catch(e) {
+						console.log(e)
+					}
+					return;
+				}
+
+				try {
+					if(embed) {
+						embed.fields[2].value = "Confirmed";
+						embed.color = parseInt("55aa55", 16);
+						embed.author = {
+							name: `Accepted by: ${member.username}#${member.discriminator} (${member.id})`,
+							icon_url: member.avatarURL
+						}
+						await bot.editMessage(message.channel.id, message.id, {embed: embed});
+						await message.removeReactions();
+					}
+				} catch(e) {
+					console.log(e);
+					message.channel.createMessage("Notification for this request couldn't be updated; the request can still be confirmed, however");
+				}
+
+				var scc = await bot.utils.updateSyncConfig(bot, smenu.reply_guild, {confirmed: true});
+				if(scc) {
+					try {
+						await bot.createMessage(smenu.reply_channel, {embed: {
+							title: "Sync Acceptance",
+							description: `Your sync request with ${message.guild.name} has been accepted!`,
+							color: parseInt("55aa55", 16),
+							timestamp: new Date().toISOString()
+						}});
+					} catch(e) {
+						console.log(e);
+						message.channel.createMessage("Couldn't send the requester the acceptance notification; please make sure they're aware that their server was accepted and that they should use `hub!ban notifs [channel]` if they want ban notifications")
+					}
+				} else message.channel.createMessage("Something went wrong while updating the request. Please try again");
+				break;
+			case "❌":
+				if(!request.confirmed) {
+					try {
+						await message.removeReaction("❌", user);
+					} catch(e) {
+						console.log(e)
+					}
+					return;
+				}
+
+				try {
+					if(embed) {
+						embed.fields[2].value = "Denied";
+						embed.color = parseInt("aa5555", 16);
+						embed.author = {
+							name: `Denied by: ${member.username}#${member.discriminator} (${member.id})`,
+							icon_url: member.avatarURL
+						}
+						await bot.editMessage(message.channel.id, message.id, {embed: embed});
+						await message.removeReactions();
+						await bot.utils.deleteSyncMenu(bot, message.channel.guild.id, message.channel.id, message.id);
+					}
+				} catch(e) {
+					console.log(e);
+					message.channel.createMessage("Notification for this request couldn't be updated; the request can still be denied, however");
+				}
+
+				var scc = await bot.utils.updateSyncConfig(bot, smenu.reply_guild, {confirmed: true});
+				if(scc) {
+					try {
+						await bot.createMessage(smenu.reply_channel, {embed: {
+							title: "Sync Denial",
+							description: `Your sync request with ${message.guild.name} has been denied.${request.confirmed ? " You'll no longer receive notifications from this server." : ""}`,
+							color: parseInt("aa5555", 16),
+							timestamp: new Date().toISOString()
+						}});
+					} catch(e) {
+						console.log(e);
+						message.channel.createMessage("Couldn't send the requester the acceptance notification; please make sure they're aware that their server was accepted")
+					}
+				} else message.channel.createMessage("Something went wrong while updating the request. Please try again");
+				break;
+		}
+	}
+
 	var post = await bot.utils.getReactionRolePost(bot, msg.channel.guild.id, msg.id);
-	var message = await bot.getMessage(msg.channel.id, msg.id);
 	if(post) {
 		var role = post.roles.find(r => (emoji.id ? r.emoji == `:${emoji.name}:${emoji.id}` || r.emoji == `a:${emoji.name}:${emoji.id}` : r.emoji == emoji.name));
 		if(!role) return;
@@ -658,14 +780,20 @@ bot.on("messageReactionRemove", async (msg, emoji, user) => {
 })
 
 bot.on("messageDelete", async (msg) => {
+	if(!msg.channel.guild) return;
 	try {
 		bot.db.query(`DELETE FROM reactposts WHERE server_id=? AND channel_id=? AND message_id=?`,[msg.channel.guild.id, msg.channel.id, msg.id]);
 		await bot.utils.deleteTicketPost(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+		await bot.utils.deletePost(bot, msg.channel.guild.id, msg.id);
 
-		var log = await bot.utils.getBanLogByMessage(bot, msg.channel.guild.id, msg.channel.id, msg.id);
-		if(log) await bot.utils.removeBanLog(bot, log.hid, msg.channel.guild.id);
+		var log
+		log = await bot.utils.getRawBanLogByMessage(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+		if(log) await bot.utils.deleteBanLog(bot, log.hid, msg.channel.guild.id);
+
+		log = await bot.utils.getRawListingLogByMessage(bot, msg.channel.guild.id, msg.channel.id, msg.id);
+		if(log) await bot.utils.deleteListingLog(bot, log.hid, msg.channel.guild.id);
 	} catch(e) {
-		console.log("Error deleting react post or ticket post:\n"+e.stack);
+		console.log("Error deleting a log:\n"+e.stack);
 	}
 })
 
@@ -675,11 +803,6 @@ bot.on("channelDelete", async (channel) => {
 	} catch(e) {
 		console.log("Error deleting support ticket:\n"+e.stack)
 	}
-})
-
-bot.on("guildCreate", async (guild) => {
-	var conf = await bot.utils.getConfig(guild.id);
-	if(!conf) bot.db.query(`INSERT INTO configs (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES (?,?,?,?,?,?,?,?)`,[srv, "", "", "", "", {}, [], {}]);
 })
 
 bot.on("guildDelete", async (guild) => {
@@ -693,6 +816,72 @@ bot.on("guildDelete", async (guild) => {
 			"where you left off, you can use this file to do so:"].join(""));
 	} catch(e) {
 		console.log("Error attempting to export/deliver data after being kicked:\n"+e.stack)
+	}
+})
+
+bot.on("guildCreate", async (guild) => {
+	var posts = await bot.utils.getPostsByServer(bot, guild.id);
+	if(!posts) return;
+
+	console.log("posts exist")
+	for(var i = 0; i < posts.length; i++) {
+		var message = await bot.getMessage(posts[i].channel_id, posts[i].message_id)
+		if(!message) continue;
+		var em = message.embeds[0];
+		em.fields[2].value = guild.memberCount;
+		await bot.editMessage(message.channel.id, message.id, {embed: em})
+	}
+})
+
+bot.on("guildMemberAdd", async (guild, member) => {
+	//update member count
+	await bot.utils.updatePostsByServer(bot, guild.id);
+
+	//notify current guild if the user is banned from their synced server
+	var scfg = await bot.utils.getSyncConfig(bot, guild.id);
+	if(!scfg || (!scfg.sync_id && !scfg.confirmed) || !scfg.ban_notifs) return;
+	var log = await bot.utils.getBanLogByUser(bot, scfg.sync_id, member.id);
+	if(log && log!="deleted") {
+		try {
+			await bot.createMessage(scfg.ban_notifs, {embed: {
+				title: "Ban Notification",
+				description: [
+					`New member **${member.username}#${member.discriminator}** (${member.id})`,
+					` has been banned from your currently synced server.\n`,
+					`Reason:\n`,
+					log.embed.fields[2].value
+				].join(""),
+				color: parseInt("aa5555", 16)
+			}})
+		} catch(e) {
+			console.log(e);
+		}
+	}
+})
+
+bot.on("guildMemberRemove", async (guild, member) => {
+	//also update member count
+	await bot.utils.updatePostsByServer(bot, guild.id)
+})
+
+bot.on("guildUpdate", async (guild) => {
+	var posts = await bot.utils.getPostsByServer(bot, guild.id);
+	if(!posts) return;
+
+	for(var i = 0; i < posts.length; i++) {
+		var message;
+		try {
+			message = await bot.getMessage(posts[i].channel_id, posts[i].message_id)
+		} catch(e) {
+			console.log(e);
+			continue;
+		}
+
+		var em = message.embeds[0];
+		em.title = guild.name;
+		em.thumbnail = {url: guild.iconURL};
+		bot.editMessage(message.channel.id, message.id, {embed: em})
+		bot.utils.updateServer(bot, guild.id, {name: guild.name, pic_url: guild.iconURL})
 	}
 })
 

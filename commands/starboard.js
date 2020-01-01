@@ -50,7 +50,7 @@ module.exports.subcommands.add = {
 				if(cfg.starboard.boards.find(c => c.emoji == emoji)) return msg.channel.createMessage("Emoji already configured.");
 			} else cfg.starboard.boards = [];
 			cfg.starboard.boards.push({channel: chan, emoji: emoji});
-			var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", cfg.starboard);
+			var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: cfg.starboard});
 			console.log(cfg.starboard);
 			if(sc) msg.channel.createMessage("Config saved")
 			else msg.channel.createMessage("Something went wrong")
@@ -58,11 +58,11 @@ module.exports.subcommands.add = {
 			cfg.starboard = {};
 			cfg.starboard.boards = [];
 			cfg.starboard.boards.push({channel: chan, emoji: emoji});
-			var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", cfg.starboard);
+			var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: cfg.starboard});
 			if(sc) msg.channel.createMessage("Config saved")
 			else msg.channel.createMessage("Something went wrong")
 		} else {
-			var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", {boards: [{channel: chan, emoji: emoji}]});
+			var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: {boards: [{channel: chan, emoji: emoji}]}});
 			if(sc) msg.channel.createMessage("Config saved")
 			else msg.channel.createMessage("Something went wrong")
 		}
@@ -92,7 +92,7 @@ module.exports.subcommands.remove = {
 			console.log(cfg.starboard);
 			if(cfg.starboard.boards.find(c => c.channel == (chan))) {
 				cfg.starboard.boards = cfg.starboard.boards.filter(c => c.channel != chan);
-				var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", cfg.starboard);
+				var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: cfg.starboard});
 				if(sc) msg.channel.createMessage("Config removed")
 				else msg.channel.createMessage("Something went wrong")
 			} else {
@@ -175,7 +175,7 @@ module.exports.subcommands.view = {
 			if(remove) {
 				cfg.starboard.boards = cfg.starboard.boards.filter(c => msg.guild.channels.find(ch => ch.id == c.channel));
 				console.log(cfg.starboard.boards)
-				await bot.utils.updateConfig(bot, msg.guild.id, "starboard", cfg.starboard);
+				await bot.utils.updateConfig(bot, msg.guild.id, {starboard: cfg.starboard});
 			}
 		} else {
 			msg.channel.createMessage("No configs registered.")
@@ -223,7 +223,7 @@ module.exports.subcommands.tolerance = {
 			if(!args[0]) {
 				if(ap.tolerance) {
 					delete ap.tolerance;
-					var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", ap);
+					var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: ap});
 					if(sc) msg.channel.createMessage("Tolerance reset")
 					else msg.channel.createMessage("Something went wrong")
 				} else {
@@ -241,7 +241,7 @@ module.exports.subcommands.tolerance = {
 						return msg.channel.createMessage("Channel not found");
 					else {
 						ap.tolerance = parseInt(args[0]);
-						var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", ap);
+						var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: ap});
 						if(sc) msg.channel.createMessage("Global tolerance set")
 						else msg.channel.createMessage("Something went wrong")
 					}
@@ -256,7 +256,7 @@ module.exports.subcommands.tolerance = {
 								return b
 							} else return b;
 						})
-						var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", ap);
+						var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: ap});
 						if(sc) msg.channel.createMessage("Board tolerance reset")
 						else msg.channel.createMessage("Something went wrong")
 					}
@@ -280,7 +280,7 @@ module.exports.subcommands.tolerance = {
 						return b
 					} else return b;
 				})
-				var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", ap);
+				var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: ap});
 				if(sc) msg.channel.createMessage("Board tolerance set")
 				else msg.channel.createMessage("Something went wrong")
 			}
@@ -307,7 +307,7 @@ module.exports.subcommands.override = {
 			return msg.channel.createMessage("Invalid input.")
 		}
 
-		var sc = await bot.utils.updateConfig(bot, msg.guild.id, "starboard", ap);
+		var sc = await bot.utils.updateConfig(bot, msg.guild.id, {starboard: ap});
 		if(sc) msg.channel.createMessage("Override set")
 		else msg.channel.createMessage("Something went wrong")
 
