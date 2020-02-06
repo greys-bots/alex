@@ -162,7 +162,7 @@ module.exports = {
 					if(!rows[0]) {
 						bot.db.query(`INSERT INTO configs 
 									 (server_id, banlog_channel, ban_message, reprole, delist_channel, starboard, blacklist, feedback) VALUES 
-									 (?,?,?,?,?,?,?,?,?,?,?)`,
+									 (?,?,?,?,?,?,?,?)`,
 									 [srv, data.banlog_channel || "", data.ban_message || "", data.reprole || "", data.delist_channel || "",
 									 data.starboard || {}, data.blacklist || [], data.feedback || {}])
 					} else {
