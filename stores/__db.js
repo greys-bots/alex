@@ -1,52 +1,60 @@
 var fs = require('fs');
 var dblite = require('dblite');
+var {Pool} = require('pg');
 
 module.exports = (bot) => {
-	db = dblite("./data.sqlite","-header");
+	// db = dblite("./data.sqlite","-header");
+	const db = new Pool();
 
 	db.query(`CREATE TABLE IF NOT EXISTS ban_logs (
-		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
-		hid 		TEXT,
-		server_id 	TEXT,
-		channel_id 	TEXT,
-		message_id 	TEXT,
-		users 		TEXT,
-		reason 		TEXT,
-		timestamp 	TEXT
+		id 				SERIAL PRIMARY KEY,
+		hid 			TEXT,
+		server_id 		TEXT,
+		channel_id 		TEXT,
+		message_id 		TEXT,
+		users 			TEXT,
+		reason 			TEXT,
+		timestamp 		TEXT
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS commands (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		server_id 	BIGINT,
-		name 		TEXT,
-		actions 	TEXT,
-		target 		TEXT,
-		del 		INTEGER
+		id 				SERIAL PRIMARY KEY,
+		server_id 		TEXT,
+		name 			TEXT,
+		actions 		JSONB,
+		target 			TEXT,
+		del 			BOOLEAN
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS configs (
-    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
-        server_id   	BIGINT,
-        banlog_channel	BIGINT,
+    	id 				SERIAL PRIMARY KEY,
+        server_id   	TEXT,
+        banlog_channel	TEXT,
         ban_message 	TEXT,
-        reprole 		BIGINT,
-        delist_channel	BIGINT,
+        reprole 		TEXT,
+        delist_channel	TEXT,
         starboard 		TEXT,
-        blacklist 		TEXT,
-        feedback 		TEXT
+        blacklist 		TEXT[]
     )`);
 
+    db.query(`CREATE TABLE IF NOT EXISTS feedback_configs (
+    	id 				SERIAL PRIMARY KEY,
+		server_id		TEXT,
+		channel_id		TEXT,
+		anon			BOOLEAN
+	)`);
+
 	db.query(`CREATE TABLE IF NOT EXISTS feedback (
-		id			INTEGER PRIMARY KEY AUTOINCREMENT,
-		hid			TEXT,
-		server_id	TEXT,
-		sender_id 	TEXT,
-		message 	TEXT,
-		anon 		INTEGER
+		id				SERIAL PRIMARY KEY,
+		hid				TEXT,
+		server_id		TEXT,
+		sender_id 		TEXT,
+		message 		TEXT,
+		anon 			BOOLEAN
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS listing_logs (
-		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		id 				SERIAL PRIMARY KEY,
 		hid 			TEXT,
 		server_id 		TEXT,
 		channel_id 		TEXT,
@@ -54,86 +62,95 @@ module.exports = (bot) => {
 		server_name 	TEXT,
 		reason 			TEXT,
 		timestamp 		TEXT,
-		type 			INTEGER
+		type 			BOOLEAN
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS posts (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        host_id 	BIGINT,
-        server_id   BIGINT,
-        channel_id  BIGINT,
-        message_id  BIGINT
+        id          	SERIAL PRIMARY KEY,
+        host_id 		TEXT,
+        server_id   	TEXT,
+        channel_id  	TEXT,
+        message_id  	TEXT
     )`);
 
     db.query(`CREATE TABLE IF NOT EXISTS reactcategories (
-    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+    	id 				SERIAL PRIMARY KEY,
     	hid 			TEXT,
-    	server_id		BIGINT,
+    	server_id		TEXT,
     	name 			TEXT,
     	description 	TEXT,
-    	roles 			TEXT,
-    	posts 			TEXT
+    	roles 			TEXT[],
+    	posts 			TEXT[]
     )`);
 
     db.query(`CREATE TABLE IF NOT EXISTS reactroles (
-    	id 				INTEGER PRIMARY KEY AUTOINCREMENT,
-    	server_id		BIGINT,
-    	role_id 		BIGINT,
+    	id 				SERIAL PRIMARY KEY,
+    	server_id		TEXT,
+    	role_id 		TEXT,
     	emoji 			TEXT,
     	description 	TEXT
     )`);
 
     db.query(`CREATE TABLE IF NOT EXISTS reactposts (
-		id			INTEGER PRIMARY KEY AUTOINCREMENT,
-		server_id	TEXT,
-		channel_id	TEXT,
-		message_id	TEXT,
-		roles		TEXT
+		id				SERIAL PRIMARY KEY,
+		server_id		TEXT,
+		channel_id		TEXT,
+		message_id		TEXT,
+		roles			TEXT[]
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS receipts (
-		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
-		hid 		TEXT,
-		server_id 	TEXT,
-		message		TEXT,
-		link		TEXT
+		id 				SERIAL PRIMARY KEY,
+		hid 			TEXT,
+		server_id 		TEXT,
+		message			TEXT,
+		link			TEXT
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS servers(
-		id         	INTEGER PRIMARY KEY AUTOINCREMENT,
-		host_id 	BIGINT,
-        server_id   BIGINT,
-        contact_id  TEXT,
-        name        TEXT,
-        description TEXT,
-        invite		TEXT,
-        pic_url     TEXT,
-        color 		TEXT,
-        visibility  INTEGER
+		id         		SERIAL PRIMARY KEY,
+		host_id 		TEXT,
+        server_id   	TEXT,
+        contact_id  	TEXT,
+        name        	TEXT,
+        description 	TEXT,
+        invite			TEXT,
+        pic_url     	TEXT,
+        color 			TEXT,
+        visibility  	BOOLEAN
 	)`);
 
-	db.query(`CREATE TABLE IF NOT EXISTS starboard (
-		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
-		server_id	BIGINT,
-		channel_id	BIGINT,
-		message_id 	BIGINT,
-		original_id BIGINT,
-		emoji 		TEXT
+	bot.db.query(`CREATE TABLE IF NOT EXISTS starboards (
+		id 				SERIAL PRIMARY KEY,
+		server_id 		TEXT,
+		channel_id		TEXT,
+		emoji			TEXT,
+		override		BOOLEAN,
+		tolerance		INTEGER
+	)`);
+
+	db.query(`CREATE TABLE IF NOT EXISTS starred_messages (
+		id 				SERIAL PRIMARY KEY,
+		server_id		TEXT,
+		channel_id		TEXT,
+		message_id 		TEXT,
+		original_id 	TEXT,
+		emoji 			TEXT
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS sync (
-		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		id 				SERIAL PRIMARY KEY,
 		server_id 		TEXT,
 		sync_id 		TEXT,
-		confirmed 		INTEGER,
-		syncable 		INTEGER,
+		confirmed 		BOOLEAN,
+		syncable 		BOOLEAN,
 		sync_notifs 	TEXT,
 		ban_notifs 		TEXT,
-		enabled 		INTEGER
+		enabled 		BOOLEAN
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS sync_menus (
-		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		id 				SERIAL PRIMARY KEY,
 		server_id 		TEXT,
 		channel_id 		TEXT,
 		message_id 		TEXT,
@@ -143,27 +160,27 @@ module.exports = (bot) => {
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS ticket_configs (
-		id 			INTEGER PRIMARY KEY AUTOINCREMENT,
-		server_id	TEXT,
-		category_id	TEXT,
-		archives_id TEXT
+		id 				SERIAL PRIMARY KEY,
+		server_id		TEXT,
+		category_id		TEXT,
+		archives_id 	TEXT
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS ticket_posts (
-		id			INTEGER PRIMARY KEY AUTOINCREMENT,
-		server_id	TEXT,
-		channel_id	TEXT,
-		message_id	TEXT
+		id				SERIAL PRIMARY KEY,
+		server_id		TEXT,
+		channel_id		TEXT,
+		message_id		TEXT
 	)`);
 
 	db.query(`CREATE TABLE IF NOT EXISTS tickets (
-		id 				INTEGER PRIMARY KEY AUTOINCREMENT,
+		id 				SERIAL PRIMARY KEY,
 		hid 			TEXT,
 		server_id 		TEXT,
 		channel_id		TEXT,
 		first_message 	TEXT,
 		opener 			TEXT,
-		users 			TEXT,
+		users 			TEXT[],
 		timestamp 		TEXT
 	)`);
 
@@ -171,10 +188,15 @@ module.exports = (bot) => {
 	var files = fs.readdirSync(__dirname);
 	for(var file of files) {
 		if(file == "__db.js") continue;
-		var name = file.replace(/store\.js/i, "")[0].toLowerCase() + 
-				   file.replace(/store\.js/i, "").slice(1) + "s"; //"ProfileStore.js" becomes "profiles"
+		var tmpname = file.replace(/store\.js/i, "");
+		var name =  tmpname[0].toLowerCase() + 
+				   (tmpname.endsWith("y") ?
+				   	tmpname.slice(1, tmpname.length-1) + "ies" : //ReactCategoryStore.js becomes reactCategories
+				    tmpname.slice(1) + "s"); //ProfileStore.js becomes "profiles"
+		console.log(name);
 
 		bot.stores[name] = require(__dirname+'/'+file)(bot, db);
+		if(bot.stores[name].init) bot.stores[name].init();
 	}
 
 	return db;

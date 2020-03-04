@@ -1,6 +1,6 @@
 const {Collection} = require("discord.js");
 
-class ConfigStore extends Collection {
+class FeedbackConfigStore extends Collection {
 	constructor(bot, db) {
 		super();
 
@@ -11,23 +11,17 @@ class ConfigStore extends Collection {
 	async create(server, data = {}) {
 		return new Promise(async (res, rej) => {
 			try {
-				await this.db.query(`INSERT INTO configs (
+				await this.db.query(`INSERT INTO feedback_configs (
 					server_id,
-					banlog_channel,
-					ban_message,
-					reprole,
-					delist_channel,
-					starboard,
-					blacklist
-				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-				[server, data.banlog_channel || "", data.ban_message || "",
-				 data.reprole || "", data.delist_channel || "",
-				 data.starboard, data.blacklist || []])
-			} catch(e) {
+					channel_id,
+					anon
+				) VALUES ($1,$2,$3)`,
+				[server, data.channel_id || "", data.anon || false]);
+			} catch() {
 				console.log(e);
 		 		return rej(e.message);
 			}
-			
+
 			res(await this.get(server));
 		})
 	}
@@ -38,9 +32,9 @@ class ConfigStore extends Collection {
 				var config = super.get(server);
 				if(config) return res(config);
 			}
-			
+
 			try {
-				var data = await this.db.query(`SELECT * FROM configs WHERE server_id = $1`,[server]);
+				var data = await this.db.query(`SELECT * FROM feedback_configs WHERE server_id = $1`,[server]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -53,15 +47,15 @@ class ConfigStore extends Collection {
 		})
 	}
 
-	async update(server, data = {}) {
+	async update(server, data) {
 		return new Promise(async (res, rej) => {
 			try {
-				await this.db.query(`UPDATE configs SET ${Object.keys(data).map((k, i) => k+"=$"+(i+2)).join(",")} WHERE server_id = $1`,[server, ...Object.values(data)]);
+				await this.db.query(`UPDATE feedback_configs SET ${Object.keys(data).map((k, i) => k+"=$"+(i+2)).join(",")} WHERE server_id=$1`,[server, ...Object.values(data)]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
 			}
-
+			
 			res(await this.get(server, true));
 		})
 	}
@@ -69,7 +63,7 @@ class ConfigStore extends Collection {
 	async delete(server) {
 		return new Promise(async (res, rej) => {
 			try {
-				await this.db.query(`DELETE FROM configs WHERE server_id = $1`, [server]);
+				await this.db.query(`DELETE FROM feedback_configs WHERE server_id = $1`, [server]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -81,4 +75,4 @@ class ConfigStore extends Collection {
 	}
 }
 
-module.exports = (bot, db) => new ConfigStore(bot, db);
+module.exports = (bot, db) => new FeedbackConfigStore(bot, db);

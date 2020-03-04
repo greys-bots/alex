@@ -10,250 +10,185 @@ class ServerStore extends Collection {
 
 	async create(host, server, data = {}) {
 		return new Promise(async (res, rej) => {
-			this.db.query(`INSERT INTO servers (
-				host_id,
-				server_id,
-				name,
-				invite,
-				pic_url
-			) VALUES (?,?,?,?,?)`,
-			[host, server, data.name || "", data.invite || "", data.pic_url || ""], async (err, rows) => {
-			 	if(err) {
-			 		console.log(err);
-			 		rej(err.message);
-			 	} else {
-			 		res(await this.get(host, server));
-			 	}
-			 })
+			try {
+				await this.db.query(`INSERT INTO servers (
+					host_id,
+					server_id,
+					name,
+					invite,
+					pic_url
+				) VALUES ($1,$2,$3,$4,$5)`,
+				[host, server, data.name || "",
+				data.invite || "", data.pic_url || ""]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res(await this.get(host, server));
 		})
 	}
 
 	async get(host, server, forceUpdate = false) {
-		return new Promise((res, rej) => {
+		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
 				var srv = super.get(`${host}-${server}`);
 				if(srv) return res(srv);
 			}
-			
-			this.db.query(`SELECT * FROM servers WHERE host_id = ? AND server_id = ?`,[host, server], {
-				id: Number,
-				host_id: String,
-				server_id: String,
-				contact_id: String,
-				name: String,
-				description: String,
-				invite: String,
-				pic_url: String,
-				color: String,
-				visibility: Boolean
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					if(rows[0]) {
-						rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
-						this.set(`${host}-${server}`, rows[0])
-						res(rows[0])
-					} else res(undefined);
-				}
-			})
+
+			try {
+				await this.db.query(`SELECT * FROM servers WHERE host_id = $1 AND server_id = $2`,[host, server]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				data.rows[0].guild = this.bot.guilds.find(g => g.id == data.rows[0].server_id);
+				this.set(`${host}-${server}`, data.rows[0])
+				res(data.rows[0])
+			} else res(undefined);
 		})
 	}
 
 	async getByID(server) {
-		return new Promise((res, rej) => {
-			this.db.query(`SELECT * FROM servers WHERE server_id = ?`,[server], {
-				id: Number,
-				host_id: String,
-				server_id: String,
-				contact_id: String,
-				name: String,
-				description: String,
-				invite: String,
-				pic_url: String,
-				color: String,
-				visibility: Boolean
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					if(rows[0]) {
-						rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
-						res(rows[0])
-					} else res(undefined);
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`SELECT * FROM servers WHERE server_id = $1`,[server]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				data.rows[0].guild = this.bot.guilds.find(g => g.id == data.rows[0].server_id);
+				res(data.rows[0])
+			} else res(undefined);
 		})
 	}
 
 	async getByRowID(id) {
-		return new Promise((res, rej) => {
-			this.db.query(`SELECT * FROM servers WHERE id = ?`,[id], {
-				id: Number,
-				host_id: String,
-				server_id: String,
-				contact_id: String,
-				name: String,
-				description: String,
-				invite: String,
-				pic_url: String,
-				color: String,
-				visibility: Boolean
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					if(rows[0]) {
-						rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
-						res(rows[0])
-					} else res(undefined);
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`SELECT * FROM servers WHERE id = $1`,[id]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				data.rows[0].guild = this.bot.guilds.find(g => g.id == data.rows[0].server_id);
+				res(data.rows[0])
+			} else res(undefined);
 		})
 	}
 
 	async getAll(host) {
-		return new Promise((res, rej) => {
-			this.db.query(`SELECT * FROM servers WHERE host_id = ?`,[host], {
-				id: Number,
-				host_id: String,
-				server_id: String,
-				contact_id: String,
-				name: String,
-				description: String,
-				invite: String,
-				pic_url: String,
-				color: String,
-				visibility: Boolean
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					if(rows[0]) {
-						for(var i = 0; i < rows.length; i++) {
-							rows[i] = bot.guilds.find(g => g.id == rows[i].server_id);
-						}
-						res(rows)
-					} else res(undefined);
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`SELECT * FROM servers WHERE host_id = $1`,[host]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				for(var i = 0; i < data.rows.length; i++)
+					data.rows[i].guild = this.bot.guilds.find(g => g.id == data.rows[i].server_id);
+
+				res(data.rows[i])
+			} else res(undefined);
 		})
 	}
 
 	async getAllWithContact(host, user) {
-		return new Promise((res, rej) => {
-			this.db.query(`SELECT * FROM servers WHERE host_id = ? AND contact_id LIKE ?`,[host, "%"+user+"%"], {
-				id: Number,
-				host_id: String,
-				server_id: String,
-				contact_id: String,
-				name: String,
-				description: String,
-				invite: String,
-				pic_url: String,
-				color: String,
-				visibility: Boolean
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					if(rows[0]) {
-						for(var i = 0; i < rows.length; i++) {
-							rows[i] = bot.guilds.find(g => g.id == rows[i].server_id);
-						}
-						res(rows)
-					} else res(undefined);
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`SELECT * FROM servers WHERE host_id = $1 AND contact_id LIKE $2`,[host, "%"+user+"%"]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				for(var i = 0; i < data.rows.length; i++)
+					data.rows[i].guild = this.bot.guilds.find(g => g.id == data.rows[i].server_id);
+
+				res(data.rows[i])
+			} else res(undefined);
 		})
 	}
 
 	async find(host, query) {
-		return new Promise((res, rej) => {
-			this.db.query(`SELECT * FROM servers WHERE host_id = ? AND (name LIKE ? OR id = ?)`, [host, "%"+query+"%", query] {
-				id: Number,
-				host_id: String,
-				server_id: String,
-				contact_id: String,
-				name: String,
-				description: String,
-				invite: String,
-				pic_url: String,
-				color: String,
-				visibility: Boolean
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					if(rows[0]) {
-						rows[0].guild = bot.guilds.find(g => g.id == rows[0].server_id);
-						res(rows[0])
-					} else res(undefined);
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`SELECT * FROM servers WHERE host_id = $1 AND (name LIKE $2 OR id = $3)`, [host, "%"+query+"%", query]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				for(var i = 0; i < data.rows.length; i++)
+					data.rows[i].guild = this.bot.guilds.find(g => g.id == data.rows[i].server_id);
+
+				res(data.rows[i])
+			} else res(undefined);
 		})
 	}
 
-	async update(host, server, data) {
-		return new Promise((res, rej) => {
-			this.db.query(`UPDATE servers SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE host_id = ? AND server_id = ?`,[...Object.values(data), host, server], async (err, rows)=> {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					res(await this.get(`${host}-${server}`, true));
-				}
-			})
+	async update(host, server, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`UPDATE servers SET ${Object.keys(data).map((k, i) => k+"=$"+(i+3)).join(",")} WHERE host_id = $1 AND server_id = $2`,[host, server, ...Object.values(data)]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+			
+			res(await this.get(host, server, true));
 		})
 	}
 
 	async updateByID(server, data) {
-		return new Promise((res, rej) => {
-			this.db.query(`UPDATE servers SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE server_id = ?`,[...Object.values(data), server], async (err, rows)=> {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					res(await this.get(server));
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`UPDATE servers SET ${Object.keys(data).map((k, i) => k+"=$"+(i+3)).join(",")} WHERE server_id = $1`,[server, ...Object.values(data)]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+			
+			res(await this.getByID(server));
 		})
 	}
 
 	async delete(host, server) {
-		return new Promise((res, rej) => {
-			this.db.query(`DELETE FROM servers WHERE host_id = ? AND server_id = ?`, [host, server], (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					super.delete(`${host}-${server}`);
-					res();
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`DELETE FROM servers WHERE host_id = $1 AND server_id = $2`, [host, server]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+			
+			super.delete(`${host}-${server}`);
+			res();
 		})
 	}
 
 	async deleteAll(host) {
-		var servers = await this.getAll(host);
-		return new Promise((res, rej) => {
-			this.db.query(`DELETE FROM servers WHERE host_id = ?`, [host], (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					for(server of servers) {
-						super.delete(`${host}-${server}`);
-					}	
-					res();
-				}
-			})
+		return new Promise(async (res, rej) => {
+			try {
+				var servers = await this.getAll(host);
+				await this.db.query(`DELETE FROM servers WHERE host_id = $1`, [host]);
+				for(server of servers) super.delete(`${host}-${server.server_id}`);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message || e);
+			}
+			
+			res();
 		})
 	}
 }

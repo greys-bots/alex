@@ -6,7 +6,7 @@ module.exports = {
 				 " edit [commandname] - Edit a command",
 				 " delete [commandname] - Delete a custom command"],
 	execute: async (bot, msg, args) => {
-		var cmds = await bot.utils.getCustomCommands(bot, msg.guild.id);
+		var cmds = await bot.stores.customCommands.getAll(msg.guild.id);
 		if(!cmds) return msg.channel.createMessage("No custom commands registered for this server");
 		console.log(cmds);
 		msg.channel.createMessage({
@@ -39,7 +39,7 @@ module.exports.subcommands.add = {
 			console.log(e);
 			return msg.channel.createMessage("Action cancelled: timed out");
 		}
-		var cmd = await bot.utils.getCustomCommand(bot, msg.guild.id, response);
+		var cmd = await bot.stores.customCommands.get(msg.guild.id, response);
 		if(cmd || bot.commands[response]) return msg.channel.createMessage("ERR: Command with that name exists. Aborting");
 		name = response;
 
@@ -124,7 +124,7 @@ module.exports.subcommands.add = {
 		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 		if(response != "y") return msg.channel.createMessage("Action aborted");
 
-		var scc = await bot.utils.addCustomCommand(bot, msg.guild.id, name, actions, target, del);
+		var scc = await bot.stores.customCommands.create(msg.guild.id, name, {actions, target, del});
 		if(scc) msg.channel.createMessage("Custom command added!");
 		else msg.channel.createMessage("Something went wrong");
 		// msg.channel.createMessage("This command is currently under construction. However, manual database editing can be used to create custom commands. USE WITH EXTREME CAUTION.")
@@ -139,10 +139,10 @@ module.exports.subcommands.delete = {
 	execute: async (bot, msg, args) => {
 		if(!args[0]) return msg.channel.createMessage("Please provide a command to delete");
 
-		var cmd = await bot.utils.getCustomCommand(bot, msg.guild.id, args[0]);
+		var cmd = await bot.stores.customCommands.get(msg.guild.id, args[0]);
 		if(!cmd) return msg.channel.createMessage("Command does not exist");
 
-		var scc = await bot.utils.deleteCustomCommand(bot, msg.guild.id, args[0]);
+		var scc = await bot.stores.customCommands.delete(msg.guild.id, args[0]);
 		if(scc) msg.channel.createMessage("Command deleted!");
 		else msg.channel.createMessage("Something went wrong");
 	},

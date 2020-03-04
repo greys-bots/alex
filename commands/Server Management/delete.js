@@ -86,8 +86,7 @@ module.exports = {
 				],
 				timestamp: date
 			}})
-		}
-		
+		}	
 	},
 	alias: ['delist'],
 	permissions: ["manageMessages"],

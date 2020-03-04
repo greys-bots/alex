@@ -6,7 +6,7 @@ module.exports = {
 	execute: async (bot, msg, args)=>{
 		if(!args[0]) {
 			try {
-				var logs = await bot.bans.getAll(msg.guild.id);
+				var logs = await bot.stores.bans.getAll(msg.guild.id);
 			} catch(e) {
 				return "ERR: "+e
 			}
@@ -34,7 +34,7 @@ module.exports = {
 		reason = reason.join(" ");
 
 		try {
-			var conf = await bot.configs.get(msg.guild.id);
+			var conf = await bot.stores.configs.get(msg.guild.id);
 			var b = await msg.guild.getBans()
 		} catch(e) {
 			console.log(e);
@@ -147,14 +147,14 @@ module.exports = {
 			}});
 		}
 
-		var scc = await bot.bans.create(code, msg.guild.id, {channel_id: message.channel.id, message_id: message.id, users: banned, reason, timestamp: date});
+		var scc = await bot.stores.bans.create(msg.guild.id, code, {channel_id: message.channel.id, message_id: message.id, users: banned, reason, timestamp: date});
 		if(scc) msg.channel.createMessage("Log added! ID: "+code);
 		else msg.channel.createMessage("The members have been banned, but the log was not successfully indexed.");
 
-		var scfg = await bot.syncConfigs.get(msg.guild.id);
+		var scfg = await bot.stores.syncConfigs.get(msg.guild.id);
 		if(!scfg) return;
 		if(scfg.syncable && scfg.enabled) {
-			var synced = await bot.utils.getSyncedServers(bot, msg.guild.id);
+			var synced = await bot.stores.syncConfigs.getSynced(msg.guild.id);
 			if(!synced || !synced[0]) return;
 			for(var i = 0; i < synced.length; i++) {
 				if(!synced[i].ban_notifs) continue;
@@ -174,12 +174,13 @@ module.exports = {
 						}})
 					} catch(e) {
 						console.log(e);
+						msg.channel.createMessage(`ERR: ${e.message}\nServer: ${synced[i].guild.name} (${synced[i].guild.id})`);
 						//guess we'll die
 					}
 				}
 			}
 		} else if(scfg.sync_id && scfg.confirmed) {
-			scfg = await bot.utils.getSyncConfig(bot, scfg.sync_id);
+			scfg = await bot.stores.syncConfigs.get(scfg.sync_id);
 			if(!scfg.ban_notifs) return;
 			try {
 				await bot.createMessage(scfg.ban_notifs, {embed: {
@@ -209,7 +210,7 @@ module.exports.subcommands.edit = {
 	usage: ()=> [" [banID] [new message] - Edit the message on a ban"],
 	execute: async (bot, msg, args) => {
 		if(!args[1]) return msg.channel.createMessage("Please provide a ban ID and a reason");
-		var log = await bot.bans.get(args[0].toLowerCase(), msg.guild.id);
+		var log = await bot.stores.bans.get(args[0].toLowerCase(), msg.guild.id);
 		var reason = args.slice(1).join(" ");
 
 		if(!log) return msg.channel.createMessage("Log not found");
@@ -231,7 +232,7 @@ module.exports.subcommands.edit = {
 			return msg.channel.createMessage("Something went wrong")
 		}
 		
-		var scc = await bot.bans.update(log.hid, msg.guild.id, {reason: reason})
+		var scc = await bot.stores.bans.update(msg.guild.id, log.hid, {reason: reason})
 		if(scc) msg.channel.createMessage("Log edited!");
 		else msg.channel.createMessage("Something went wrong");
 	},
@@ -247,7 +248,7 @@ module.exports.subcommands.notification = {
 		var channel = msg.guild.channels.find(ch => (ch.name == args[0].toLowerCase() || ch.id == args[0].replace(/[<#>]/g,"")) && ch.type == 0);
 		if(!channel) return msg.channel.createMessage("Couldn't find that channel");
 
-		var scc = await bot.syncConfigs.update(msg.guild.id, {ban_notifs: channel.id});
+		var scc = await bot.stores.syncConfigs.update(msg.guild.id, {ban_notifs: channel.id});
 		if(scc) msg.channel.createMessage("Channel set! Make sure you sync your server with another in order to get the full effect");
 		else msg.channel.createMessage("Something went wrong");
 	},
@@ -257,19 +258,19 @@ module.exports.subcommands.notification = {
 }
 
 //function to fix old logs, if needed
-module.exports.subcommands.index = {
-	execute: async (bot, msg, args) => {
-		var logs = await bot.utils.getBanLogs(bot, msg.guild.id);
-		if(!logs || !logs[0]) return msg.channel.createMessage("No logs registered for this server");
-		var date = new Date();
+// module.exports.subcommands.index = {
+// 	execute: async (bot, msg, args) => {
+// 		var logs = await bot.utils.getBanLogs(bot, msg.guild.id);
+// 		if(!logs || !logs[0]) return msg.channel.createMessage("No logs registered for this server");
+// 		var date = new Date();
 
-		msg.addReaction(process.env.HOURGLASS || "⌛");
-		for(var i = 0; i < logs.length; i++) {
-			await bot.utils.updateBanLog(bot, logs[i].hid, msg.guild.id, {reason: logs[i].embed && logs[i].embed.fields && logs[i].embed.fields[2] ? logs[i].embed.fields[2].value : "(no reason given)", timestamp: logs[i].embed ? logs[i].embed.timestamp : date.toISOString()})
-		}
-		msg.removeReaction(process.env.HOURGLASS || "⌛");
+// 		msg.addReaction(process.env.HOURGLASS || "⌛");
+// 		for(var i = 0; i < logs.length; i++) {
+// 			await bot.utils.updateBanLog(bot, logs[i].hid, msg.guild.id, {reason: logs[i].embed && logs[i].embed.fields && logs[i].embed.fields[2] ? logs[i].embed.fields[2].value : "(no reason given)", timestamp: logs[i].embed ? logs[i].embed.timestamp : date.toISOString()})
+// 		}
+// 		msg.removeReaction(process.env.HOURGLASS || "⌛");
 		
-		msg.channel.createMessage("Ban logs indexed!");
-	},
-	permissions: ["manageMessages"]
-}
+// 		msg.channel.createMessage("Ban logs indexed!");
+// 	},
+// 	permissions: ["manageMessages"]
+// }

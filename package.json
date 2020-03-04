@@ -9,7 +9,8 @@
     "eris": "github:abalabahaha/eris#dev",
     "eris-additions": "^1.2.5",
     "mysql": "^2.17.1",
-    "node-fetch": "^2.6.0"
+    "node-fetch": "^2.6.0",
+    "pg": "^7.18.2"
   },
   "scripts": {
     "start": "supervisor -e .js,.json -i data.sqlite,data.sqlite-journal bot.js"

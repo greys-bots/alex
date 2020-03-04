@@ -15,7 +15,7 @@ class ReceiptStore extends Collection {
 				server_id,
 				message,
 				link
-			) VALUES (?,?,?,?)`,
+			) VALUES ($1,$2,$3,$4)`,
 			[hid, server, data.message || "", data.link || ""], async (err, rows) => {
 			 	if(err) {
 			 		console.log(err);
@@ -34,7 +34,7 @@ class ReceiptStore extends Collection {
 				if(receipt) return res(receipt);
 			}
 			
-			this.db.query(`SELECT * FROM receipts WHERE server_id = ? AND hid = ?`,[server, hid], {
+			this.db.query(`SELECT receipts.*, (SELECT * FROM receipts WHERE link = receipts.hid) as linked FROM receipts WHERE server_id = $1 AND hid = $2`,[server, hid], {
 				id: Number,
 				hid: String,
 				server_id: String,
@@ -56,7 +56,7 @@ class ReceiptStore extends Collection {
 
 	async getAll(server) {
 		return new Promise((res, rej) => {
-			this.db.query(`SELECT * FROM receipts WHERE server_id = ?`,[server], {
+			this.db.query(`SELECT * FROM receipts WHERE server_id = $1`,[server], {
 				id: Number,
 				hid: String,
 				server_id: String,
@@ -76,7 +76,7 @@ class ReceiptStore extends Collection {
 
 	async update(server, hid, data) {
 		return new Promise((res, rej) => {
-			this.db.query(`UPDATE receipts SET ${Object.keys(data).map((k) => k+"=?").join(",")} WHERE server_id = ? AND hid = ?`,[...Object.values(data), server, hid], async (err, rows)=> {
+			this.db.query(`UPDATE receipts SET ${Object.keys(data).map((k, i) => k+"=$"+(i+3)).join(",")} WHERE server_id = $1 AND hid = $2`,[server, hid, ...Object.values(data)], async (err, rows)=> {
 				if(err) {
 					console.log(err);
 					rej(err.message);
@@ -89,12 +89,32 @@ class ReceiptStore extends Collection {
 
 	async delete(server, hid) {
 		return new Promise((res, rej) => {
-			this.db.query(`DELETE FROM configs WHERE server_id = ? AND hid = ?`, [server, hid], (err, rows) => {
+			this.db.query(`DELETE FROM receipts WHERE server_id = $1 AND hid = $2`, [server, hid], (err, rows) => {
 				if(err) {
 					console.log(err);
 					rej(err.message);
 				} else {
 					super.delete(`${server}-${hid}`);
+					res();
+				}
+			})
+		})
+	}
+
+	async deleteAll(server) {
+		try {
+			var receipts = await this.getAll(server);
+		} catch(e) {
+			return rej(e);
+		}
+		
+		return new Promise((res, rej) => {
+			this.db.query(`DELETE FROM receipts WHERE server_id = $1`, [server], (err, rows) => {
+				if(err) {
+					console.log(err);
+					rej(err.message);
+				} else {
+					for(var receipt of receipts) super.delete(`${server}-${receipt.hid}`);
 					res();
 				}
 			})
@@ -136,26 +156,6 @@ class ReceiptStore extends Collection {
 			}
 
 			res();
-		})
-	}
-
-	async getLinked(server, hid) {
-		return new Promise((res, rej) => {
-			bot.db.query(`SELECT * FROM receipts WHERE link = ? AND server_id = ?`, [hid, server],
-			{
-				id: Number,
-				hid: String,
-				server_id: String,
-				message: String,
-				link: String
-			}, (err, rows) => {
-				if(err) {
-					console.log(err);
-					rej(err.message);
-				} else {
-					res(rows)
-				}
-			})
 		})
 	}
 }
