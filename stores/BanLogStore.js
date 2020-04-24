@@ -16,6 +16,21 @@ class BanLogStore extends Collection {
 				console.log(e);
 			}
 		})
+
+		this.bot.on("messageDelete", async (msg) => {
+			return new Promise(async (res, rej) => {
+				if(msg.channel.type == 1) return;
+
+				try {
+					var log = await this.getByMessage(msg.channel.guild.id, msg.channel.id, msg.id);
+					if(!log) return;
+					await this.delete(log.server_id, log.hid);
+				} catch(e) {
+					console.log(e);
+					return rej(e.message || e);
+				}
+			})	
+		})
 	}
 
 	async create(server, hid, data = {}) {
@@ -41,6 +56,29 @@ class BanLogStore extends Collection {
 		})
 	}
 
+	async index(server, hid, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO ban_logs (
+					hid,
+					server_id,
+					channel_id,
+					message_id,
+					users,
+					reason,
+					timestamp
+				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				[hid, server, data.channel_id || "", data.message_id || "", data.users || [],
+				 data.reason || "", data.timestamp || new Date().toISOString()])
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
+		})
+	}
+
 	async get(server, hid, forceUpdate = false) {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
@@ -53,7 +91,7 @@ class BanLogStore extends Collection {
 					SELECT ban_logs.*,
 					(SELECT row_to_json(
 						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_log.server_id AND hid = ban_log.hid) AS receipt
+					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
 					FROM ban_logs WHERE server_id = $1 AND hid = $2
 				`, [server, hid]);
 			} catch(e) {
@@ -78,37 +116,6 @@ class BanLogStore extends Collection {
 		})
 	}
 
-	async getByUser(server, user) {
-		return new Promise(async (res, rej) => {
-			try {
-				var data = await this.db.query(`
-					SELECT ban_logs.*,
-					(SELECT row_to_json(
-						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_log.server_id AND hid = ban_log.hid) AS receipt
-					FROM ban_logs WHERE server_id = $1 AND users LIKE $2
-				`, [server, `%"${user}"%`]);
-			} catch(e) {
-				console.log(e);
-				return rej(e.message);
-			}
-
-			if(data.rows && data.rows[0]) {
-				var message;
-				try {
-					message = await this.bot.getMessage(data.rows[0].channel_id, data.rows[0].message_id);
-				} catch(e) {
-					console.log(e);
-				}
-
-				if(message) data.rows[0].embed = message.embeds[0];
-				else await this.delete(server, data.rows[0].hid);
-
-				res(data.rows[0])
-			} else res(undefined)
-		})
-	}
-
 	async getByMessage(server, channel, message) {
 		return new Promise(async (res, rej) => {
 			try {
@@ -116,7 +123,7 @@ class BanLogStore extends Collection {
 					SELECT ban_logs.*,
 					(SELECT row_to_json(
 						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_log.server_id AND hid = ban_log.hid) AS receipt
+					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
 					FROM ban_logs WHERE server_id = $1 AND channel_id = $2 AND message_id = $3
 				`, [server, channel, message]);
 			} catch(e) {
@@ -147,9 +154,46 @@ class BanLogStore extends Collection {
 					SELECT ban_logs.*,
 					(SELECT row_to_json(
 						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_log.server_id AND hid = ban_log.hid) AS receipt
+					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
 					FROM ban_logs WHERE server_id = $1
 				`, [server]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			if(data.rows && data.rows[0]) {
+				var logs = [];
+				for(var i = 0; i < data.rows.length; i++) {
+					var message;
+
+					try {
+						message = await this.bot.getMessage(data.rows[i].channel_id, data.rows[i].message_id);
+					} catch(e) {
+						console.log(e.stack);
+						await this.delete(server, data.rows[i].hid);
+						continue;
+					}
+
+					data.rows[i].embed = message.embeds[0];
+					logs.push(data.rows[i]);
+				}
+
+				res(logs);
+			} else res(undefined)
+		})
+	}
+
+	async getByUser(server, user) {
+		return new Promise(async (res, rej) => {
+			try {
+				var data = await this.db.query(`
+					SELECT ban_logs.*,
+					(SELECT row_to_json(
+						(SELECT a FROM (SELECT receipts.*) a)
+					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
+					FROM ban_logs WHERE server_id = $1 AND $2=ANY(users)
+				`, [server, user]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -229,20 +273,14 @@ class BanLogStore extends Collection {
 	async delete(server, hid) {
 		return new Promise(async (res, rej) => {
 			try {
-				var ban = await this.get(server, hid);
-				this.db.query(`DELETE FROM ban_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
+				var data = await this.db.query(`SELECT * FROM ban_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
+				await this.db.query(`DELETE FROM ban_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
+				super.delete(`${server}-${hid}`);
+				this.bot.stores.receipts.delete(server, hid);
+				if(data.rows && data.rows[0]) await this.bot.deleteMessage(data.rows[0].channel_id, data.rows[0].message_id);
 			} catch(e) {
 				console.log(e);
-				return rej(e.message || e);
-			}
-
-			super.delete(`${server}-${hid}`);
-			this.bot.stores.receipts.delete(server, hid);
-			try {
-				await this.bot.deleteMessage(ban.channel_id, ban.message_id);
-			} catch(e) {
-				console.log(e);
-				return rej(e.message);
+				if(!e.message.includes("Uknown Message")) return rej(e.message);
 			}
 			res();
 		})
@@ -265,7 +303,7 @@ class BanLogStore extends Collection {
 						await this.bot.deleteMessage(log.channel_id, log.message_id);
 					} catch(e) {
 						console.log(e);
-						return rej(e.message);
+						if(!e.message.includes("Uknown Message")) return rej(e.message);
 					}
 				}
 			}
@@ -277,6 +315,7 @@ class BanLogStore extends Collection {
 	async scrub(server, user) {
 		return new Promise(async (res, rej) => {
 			var logs = await this.getByUser(server, user);
+			console.log(logs);
 			if(!logs || !logs[0]) return res(true);
 
 			for(var i = 0; i < logs.length; i++) {
@@ -301,9 +340,11 @@ class BanLogStore extends Collection {
 
 	async handleReactions(msg, emoji, user, store) {
 		return new Promise(async res => {
+			if(user == this.bot.user.id) return;
 			try {
 				msg = store.bot.getMessage(msg.channel.id, msg.id);
 			} catch(e) {
+				if(e.message.contains("Unknown Message")) return;
 				console.log(e);
 				return rej(e.message);
 			}

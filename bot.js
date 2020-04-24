@@ -1,4 +1,5 @@
 const Eris 		= require("eris-additions")(require("eris"));
+const Discord   = require("discord.js");
 const dblite 	= require("dblite");
 const fs 		= require("fs");
 const path 		= require("path");	
@@ -7,15 +8,13 @@ require('dotenv').config();
 
 const bot 		= new Eris(process.env.TOKEN, {restMode: true});
 
-bot.utils 		= require('./utilities')
-
 bot.chars 		= process.env.CHARS;
 bot.prefix 		= process.env.PREFIX;
 bot.owner 		= process.env.OWNER;
+bot.invite 		= process.env.INVITE;
 
 bot.fetch 		= require('node-fetch');
-
-bot.commands 	= {};
+bot.tc 			= require('tinycolor2');
 
 bot.customActions = [
 	{name: "member.hr", replace: "msg.member.hasRole"},
@@ -108,7 +107,7 @@ const registerCommand = function({command, module, name} = {}) {
 
 async function setup() {
 	var files;
-	bot.db = require('./stores/__db.js')(bot);
+	bot.db = await require('./stores/__db.js')(bot);
 
 	files = fs.readdirSync("./events");
 	files.forEach(f => bot.on(f.slice(0,-3), (...args) => require("./events/"+f)(...args,bot)));
@@ -158,38 +157,24 @@ bot.asyncForEach = async (arr, bot, msg, args, cb) => {
 }
 
 bot.parseCommand = async function(bot, msg, args, command) {
-	return new Promise(async (res,rej)=>{
-		var commands;
-		var cmd;
-		var name = "";
-		if(command) {
-			commands = command.subcommands || [];
-		} else {
-			commands = bot.commands;
-		}
+	if(!args[0]) return undefined;
+	
+	var command = bot.commands.get(bot.aliases.get(args[0].toLowerCase()));
+	if(!command) return {command, args};
 
-		if(args[0] && commands[args[0].toLowerCase()]) {
-			cmd = commands[args[0].toLowerCase()];
-			name = args[0].toLowerCase();
-			args = args.slice(1);
-		} else if(args[0] && Object.values(commands).find(cm => cm.alias && cm.alias.includes(args[0].toLowerCase()))) {
-			cmd = Object.values(commands).find(cm => cm.alias && cm.alias.includes(args[0].toLowerCase()));
-			name = args[0].toLowerCase();
-			args = args.slice(1);
-		} else if(!cmd) {
-			res(undefined);
-		}
+	args.shift();
+	var permcheck = true;
 
-		if(cmd && cmd.subcommands && args[0]) {
-			let data = await bot.parseCommand(bot, msg, args, cmd);
-			if(data) {
-				cmd = data[0]; args = data[1];
-				name += " "+data[2];
-			}
-		}
+	if(args[0] && command.subcommands && command.subcommands.get(command.sub_aliases.get(args[0].toLowerCase()))) {
+		command = command.subcommands.get(command.sub_aliases.get(args[0].toLowerCase()));
+		args.shift();
+	}
 
-		res([cmd, args, name]);
-	})
+	//will erroneously give true in dms even though perms don't exist
+	//guildOnly check is done first in actual command execution though,
+	//so that doesn't matter
+	if(command.permissions && msg.guild) permcheck = command.permissions.filter(x => msg.member.permission.has(x)).length == command.permissions.length;
+	return {command, args, permcheck};
 }
 
 bot.parseCustomCommand = async function(bot, msg, args) {
@@ -197,8 +182,8 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 		if(!args || !args[0]) return res(undefined);
 		if(!msg.guild) return res(undefined);
 		var name = args.shift();
-		var cmd = await bot.utils.getCustomCommand(bot, msg.guild.id, name);
-		if(!cmd) return res(undefined);
+		var cmd = await bot.stores.customCommands.get(msg.guild.id, name);
+		if(!cmd) return res({});
 
 		cmd.newActions = [];
 
@@ -357,10 +342,11 @@ bot.parseCustomCommand = async function(bot, msg, args) {
 				}, 2000)
 				
 			}
-			
 		}
 
-		res([cmd, args, name])
+		cmd.name = name;
+
+		res({command: cmd, args})
 	})
 }
 
@@ -369,5 +355,14 @@ bot.on("ready",()=>{
 	updateStatus();
 })
 
-setup();
-bot.connect();
+setup().then(()=> {
+	bot.connect();
+}).catch(e => {
+	console.log(e);
+	process.exit();
+})
+
+process.on('unhandledRejection', error => {
+  //figure out better error handling
+  console.log(error);
+});

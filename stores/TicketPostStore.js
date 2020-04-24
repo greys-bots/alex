@@ -11,10 +11,25 @@ class TicketPostStore extends Collection {
 	async init() {
 		this.bot.on("messageReactionAdd", (...args) => {
 			try {
-				this.handleReactions(...args, this)
+				this.handleReactions(...args)
 			} catch(e) {
 				console.log(e);
 			}
+		})
+
+		this.bot.on("messageDelete", async (msg) => {
+			return new Promise(async (res, rej) => {
+				if(msg.channel.type == 1) return;
+
+				try {
+					var ticket = await this.get(msg.channel.guild.id, msg.id);
+					if(!ticket) return;
+					await this.delete(ticket.server_id, ticket.message_id);
+				} catch(e) {
+					console.log(e);
+					return rej(e.message || e);
+				}
+			})	
 		})
 	}
 
@@ -33,6 +48,24 @@ class TicketPostStore extends Collection {
 			}
 			
 			res(await this.get(server, message));
+		})
+	}
+
+	async index(server, channel, message, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO posts (
+					server_id,
+					channel_id,
+					message_id
+				) VALUES ($1,$2,$3)`,
+				[server, channel, message]);
+			} catch(e) {
+				console.log(e);
+	 			return rej(e.message);
+			}
+			
+			res();
 		})
 	}
 
@@ -82,49 +115,40 @@ class TicketPostStore extends Collection {
 	async delete(server, message) {
 		return new Promise(async (res, rej) => {
 			try {
-				var post = await this.get(server, message);
-			} catch(e) {
-				console.log(e);
-				return rej(e.message);
-			}
-			if(!post) return rej("Post not found");
-
-			try {
 				await this.db.query(`DELETE FROM posts WHERE server_id = $1 AND message_id = $2`, [server, message]);
 				super.delete(`${server}-${message}`);
-				await this.bot.deleteMessage(post.channel_id, post.message_id);
 			} catch(e) {
 				console.log(e);
-				if(e.message && !e.message.toLowerCase().contains("unknown message")) return rej(e.message);
-				else if(!e.message) return rej(e);
+				return rej(e.message || e);
 			}
 
 			res();
 		})
 	}
 
-	async handleReactions(msg, emoji, user, store) {
+	async handleReactions(msg, emoji, user) {
 		return new Promise(async (res, rej) => {
+			if(this.bot.user.id == user) return;
 			try {
-				msg = store.bot.getMessage(msg.channel.id, msg.id);
+				msg = await this.bot.getMessage(msg.channel.id, msg.id);
 			} catch(e) {
-				console.log(e);
+				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
 				return rej(e.message);
 			}
 
 			if(!msg.guild) return res();
 
-			var tpost = await store.get(bot, msg.channel.guild.id, msg.id);
+			var tpost = await this.get(this.bot, msg.channel.guild.id, msg.id);
 			if(!tpost) return res();
 			try {
-				await bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user);
+				await this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
 			}
 			
-			var ch = await bot.getDMChannel(user);
-			var tickets = await store.bot.stores.tickets.getByUser(msg.channel.guild.id, user);
+			var ch = await this.bot.getDMChannel(user);
+			var tickets = await this.bot.stores.tickets.getByUser(msg.channel.guild.id, user);
 			if(tickets && tickets.length >= 5) {
 				try {
 					return ch.createMessage("Couldn't open ticket: you already have 5 open for that server")
@@ -134,8 +158,8 @@ class TicketPostStore extends Collection {
 				}
 			}
 
-			var us = await store.bot.utils.fetchUser(bot, user);
-			var ticket = await store.bot.stores.tickets.create(msg.channel.guild.id, us);
+			var us = await this.bot.utils.fetchUser(bot, user);
+			var ticket = await this.bot.stores.tickets.create(msg.channel.guild.id, us);
 			if(!ticket.hid) {
 				try {
 					ch.createMessage("Couldn't open your support ticket:\n"+ticket.e);

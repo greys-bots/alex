@@ -12,10 +12,11 @@ module.exports = {
 	desc: ()=> ["This command syncs your server with a host server, giving you ban updates (configured ",
 				"with `hub!ban notifs [channel]`) and syncing your member count, server name, and server icon with your server's listings."].join(""),
 	execute: async (bot, msg, args) => {
-		var cfg = await bot.utils.getSyncConfig(bot, msg.guild.id) || {};
-		//send config
+		var cfg = await bot.stores.syncConfigs.get(msg.guild.id);
+
 		if(!args[0]) {
-			return await msg.channel.createMessage({embed: {
+			if(!cfg) return "No config exists for this server";
+			return {embed: {
 				title: "Sync Config",
 				fields: [
 					{name: "Syncable?", value: `${cfg.syncable ? "Yes" : "No"}`},
@@ -23,41 +24,46 @@ module.exports = {
 					{name: "Sync Notifs Channel", value: `${cfg.sync_notifs ? (msg.guild.channels.find(ch => ch.id == cfg.sync_notifs) ? msg.guild.channels.find(ch => ch.id == cfg.sync_notifs).name : "Invalid channel! Please set again") : "Not set"}`},
 					{name: "Ban Notifs Channel", value: `${cfg.ban_notifs ? (msg.guild.channels.find(ch => ch.id == cfg.ban_notifs) ? msg.guild.channels.find(ch => ch.id == cfg.ban_notifs).name : "Invalid channel! Please set again") : "Not set"}`}
 				]
-			}})
+			}}
 		}
 
-		//do syncing
-		if(!cfg || !cfg.sync_notifs) return msg.channel.createMessage("Please configure a notifications channel before attempting to sync with another server");
-		if(args[0] == cfg.sync_id) return msg.channel.createMessage("You're already synced with that server!");
-		if(args[0] == msg.guild.id) return msg.channel.createMessage("You can't sync with yourself!");
+		if(!cfg || !cfg.sync_notifs) return "Please configure a notifications channel before attempting to sync with another server";
+		if(args[0] == cfg.sync_id) return "You're already synced with that server!";
+		if(args[0] == msg.guild.id) return "You can't sync with yourself!";
 
 		var guild = await bot.guilds.find(g => g.id == args[0]);
-		if(!guild) return msg.channel.createMessage("Couldn't get that guild. Make sure it exists and that I'm in it");
+		if(!guild) return "Couldn't get that guild. Make sure it exists and that I'm in it";
 
-		var gcfg = await bot.utils.getSyncConfig(bot, guild.id);
-		if(!gcfg || !gcfg.syncable || !gcfg.sync_notifs) return msg.channel.createMessage("That guild is not available to sync with");
+		var gcfg = await bot.stores.syncConfigs.get(guild.id);
+		if(!gcfg || !gcfg.syncable || !gcfg.sync_notifs) return "That guild is not available to sync with";
 
-		if(cfg.sync_id && !cfg.confirmed) return msg.channel.createMessage("You already have a pending sync request out. Please wait to change synced servers until after that request goes through, or cancel it first");
+		if(cfg.sync_id && !cfg.confirmed) return "You already have a pending sync request out. Please wait to change synced servers until after that request goes through, or cancel it first";
 		if(cfg.syncable) {
 			await msg.channel.createMessage("WARNING: Syncing your guild with another guild will stop others from syncing with yours. Are you sure you want to do this? (y/n)");
 			var resp;
 			var resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {maxMatches: 1, time: 30000});
-			if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
-			if(!["y","yes"].includes(resp[0].content.toLowerCase())) return msg.channel.createMessage("Action cancelled");
+			if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
+			if(!["y","yes"].includes(resp[0].content.toLowerCase())) return "Action cancelled";
 
-			//maybe figure out a way to alert synced servers?
-			var unsync = await bot.utils.unsyncServers(bot, msg.guild.id);
-			if(!unsync) return msg.channel.createMessage("Something went wrong while unsyncing servers synced to yours. Please try again");
+			try {
+				var synced = await bot.stores.syncConfigs.getSynced(msg.guild.id);
+				for(var snc of synced) {
+					await bot.createMessage(snc.sync_notifs, "Your synced server is no longer syncable. You will no longer receive sync notifications unless you sync to another server");
+				}
+				await bot.stores.syncConfigs.unsync(msg.guild.id);
+			} catch(e) {
+				return "ERR: " + (e.message || e);
+			}
  		}
 
 		if(cfg.sync_id && cfg.confirmed) {
 			await msg.channel.createMessage("WARNING: Syncing your guild with another guild will stop notifications from your current synced guild. Are you sure you want to do this? (y/n)");
 			var resp;
 			var resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {maxMatches: 1, time: 30000});
-			if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
-			if(!["y","yes"].includes(resp[0].content.toLowerCase())) return msg.channel.createMessage("Action cancelled");
+			if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
+			if(!["y","yes"].includes(resp[0].content.toLowerCase())) return "Action cancelled";
 
-			var req = await bot.utils.getSyncRequest(bot, cfg.sync_id, msg.guild.id);
+			var req = await bot.stores.syncMenus.getRequest(cfg.sync_id, msg.guild.id);
 			if(req && req.message) {
 				try {
 					var oldmessage = await bot.getMessage(req.channel, req.message);
@@ -70,7 +76,7 @@ module.exports = {
 							icon_url: msg.author.avatarURL
 						}
 						await bot.editMessage(req.channel, req.message, {embed: embed});
-						await bot.utils.deleteSyncMenu(bot, oldmessage.channel.guild.id, oldmessage.channel.id, oldmessage.id);
+						await bot.stores.syncMenus.delete(oldmessage.channel.guild.id, oldmessage.channel.id, oldmessage.id);
 
 						oldmessage.channel.createMessage({embed: {
 							title: "Sync Cancellation",
@@ -84,8 +90,8 @@ module.exports = {
 					msg.channel.createMessage("Your sync cancellation couldn't be sent to the synced server. However, you can still be unsynced")
 				}
 
-				var unsync = await bot.utils.updateSyncConfig(bot, msg.guild.id, {syncable: false, confirmed: false, sync_id: ""});
-				if(!unsync) return msg.channel.createMessage("Something went wrong while trying to cancel your existing sync request. Please try again");
+				var unsync = await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: ""});
+				if(!unsync) return "Something went wrong while trying to cancel your existing sync request. Please try again";
 			}
 		}
 
@@ -107,7 +113,7 @@ module.exports = {
 			}})
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Something went wrong when sending a confirmation to that guild. Please contact the guild's admins and make sure their `sync_notifs` channel exists and that I can message it");
+			return "Something went wrong when sending a confirmation to that guild. Please contact the guild's admins and make sure their `sync_notifs` channel exists and that I can message it";
 		}
 		try {
 			["✅","❌"].forEach(r => message.addReaction(r));
@@ -117,31 +123,14 @@ module.exports = {
 			message.channel.createMessage("(Couldn't add the reactions- make sure I have the `addReactions` permission! Reactions from mods should still work, however)");
 		}
 		
-		var scc = await bot.utils.addSyncMenu(bot, message.guild.id, message.channel.id, message.id, 0, msg.guild.id, cfg.sync_notifs);
-		var scc2 = await bot.utils.updateSyncConfig(bot, msg.guild.id, {syncable: false, confirmed: false, sync_id: guild.id});
-
-		if(scc && scc2) msg.channel.createMessage("Confirmation sent! You'll get a notification when they accept/deny it");
-		else if(!scc && scc2) {
-			message.channel.createMessage("Something went wrong when inserting the confirmation into the database. However, this request can still be manually confirmed using `hub!sync accept` and `hub!sync deny`");
-		} else if(scc && !scc2) msg.channel.createMessage("Couldn't update your sync config. This request can still be confirmed, however");
-		else {
-			msg.channel.createMessage("Couldn't add the sync menu or update your sync config, thus this sync attempt cannot be completed. Please try again");
-			await message.edit({embed: {
-				title: "Sync Request",
-				description: ["Someone has requested to sync to your server!\n",
-							  `UPDATE: Something went wrong when handling this sync request. This request cannot be accepted or denied.`].join(""),
-				fields: [
-					{name: "Requesting Server", value: `${msg.guild.name} (${msg.guild.id})`},
-					{name: "Requesting User", value: `${msg.author.username}#${msg.author.discriminator} (${msg.author.id})`},
-					{name: "Current Status", value: "ERROR"}
-				],
-				color: parseInt("aa5555", 16),
-				footer: {
-					text: `Requester ID: ${msg.guild.id}`
-				},
-				timestamp: date.toISOString()
-			}})
+		try {
+			await bot.stores.syncMenus.create(message.guild.id, message.channel.id, message.id, {type: 0, reply_guild: msg.guild.id, reply_channel: cfg.sync_notifs});
+			await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: guild.id});
+		} catch(e) {
+			return "ERR: " + e;
 		}
+
+		return "Confirmation sent! You'll get a notification when they accept/deny it";
 	},
 	guildOnly: true,
 	subcommands: {},
@@ -152,11 +141,11 @@ module.exports.subcommands.accept = {
 	help: ()=> "Manually accept a server's sync request",
 	usage: ()=> [" [serverID] - Accepts the given server's sync request"],
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a server to accept a request from");
-		var request = await bot.utils.getSyncRequest(bot, msg.guild.id, args[0]);
-		if(!request) return msg.channel.createMessage("Couldn't find an open request from that server");
+		if(!args[0]) return "Please provide a server to accept a request from";
+		var request = await bot.stores.syncMenus.getRequest(msg.guild.id, args[0]);
+		if(!request) return "Couldn't find an open request from that server";
 
-		if(request.confirmed) return msg.channel.createMessage("That request has already been confirmed");
+		if(request.confirmed) return "That request has already been confirmed";
 
 		if(request.message) {
 			var message;
@@ -178,24 +167,26 @@ module.exports.subcommands.accept = {
 			}
 		}
 
-		var scc = await bot.utils.updateSyncConfig(bot, request.requester, {confirmed: true});
-		if(scc) {
-			var ch;
-			if(request.requester_channel) {
-				try {
-					await bot.createMessage(request.requester_channel, {embed: {
-						title: "Sync Acceptance",
-						description: `Your sync request with ${msg.guild.name} has been accepted!`,
-						color: parseInt("55aa55", 16),
-						timestamp: new Date().toISOString()
-					}});
-				} catch(e) {
-					console.log(e);
-					return msg.channel.createMessage("Couldn't send the requester the acceptance notification; please make sure they're aware that their server was accepted")
-				}
+		try {
+			await bot.stores.syncConfigs.update(bot, request.requester, {confirmed: true});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+		
+		if(request.requester_channel) {
+			try {
+				await bot.createMessage(request.requester_channel, {embed: {
+					title: "Sync Acceptance",
+					description: `Your sync request with ${msg.guild.name} has been accepted!`,
+					color: parseInt("55aa55", 16),
+					timestamp: new Date().toISOString()
+				}});
+			} catch(e) {
+				console.log(e);
+				return "Couldn't send the requester the acceptance notification; please make sure they're aware that their server was accepted"
 			}
-			msg.channel.createMessage("The sync request has been accepted!")
-		} else msg.channel.createMessage("Something went wrong while updating the request. Please try again");
+		}
+		return "The sync request has been accepted!";
 	},
 	guildOnly: true,
 	permissions: ["manageMessages"],
@@ -207,9 +198,9 @@ module.exports.subcommands.deny = {
 	usage: ()=> [" [serverID] - Denies the given server's sync request"],
 	desc: ()=> "This command can be used to revoke a sync at any time.",
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a server to deny a request from");
-		var request = await bot.utils.getSyncRequest(bot, msg.guild.id, args[0]);
-		if(!request) return msg.channel.createMessage("Couldn't find an open request from that server");
+		if(!args[0]) return "Please provide a server to deny a request from";
+		var request = await bot.stores.syncMenus.getRequest(msg.guild.id, args[0]);
+		if(!request) return "Couldn't find an open request from that server";
 
 		if(request.message) {
 			var message;
@@ -224,7 +215,7 @@ module.exports.subcommands.deny = {
 						icon_url: msg.author.avatarURL
 					}
 					await bot.editMessage(request.channel, request.message, {embed: embed});
-					await bot.utils.deleteSyncMenu(bot, message.channel.guild.id, message.channel.id, message.id);
+					await bot.stores.syncMenus.delete(message.channel.guild.id, message.channel.id, message.id);
 				}
 			} catch(e) {
 				console.log(e);
@@ -232,24 +223,27 @@ module.exports.subcommands.deny = {
 			}
 		}
 
-		var scc = await bot.utils.updateSyncConfig(bot, request.requester, {confirmed: false, sync_id: ""});
-		if(scc) {
-			var ch;
-			if(request.requester_channel) {
-				try {
-					await bot.createMessage(request.requester_channel, {embed: {
-						title: "Sync Denial",
-						description: `Your sync request with ${msg.guild.name} has been denied.${request.confirmed ? " You'll no longer receive notifications from this server." : ""}`,
-						color: parseInt("aa5555", 16),
-						timestamp: new Date().toISOString()
-					}});
-				} catch(e) {
-					console.log(e);
-					return msg.channel.createMessage("Couldn't send the requester the denial notification; please make sure they're aware that their server was denied")
-				}
+		try {
+			await bot.stores.syncConfigs.update(request.requester, {confirmed: false, sync_id: ""});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		if(request.requester_channel) {
+			try {
+				await bot.createMessage(request.requester_channel, {embed: {
+					title: "Sync Denial",
+					description: `Your sync request with ${msg.guild.name} has been denied.${request.confirmed ? " You'll no longer receive notifications from this server." : ""}`,
+					color: parseInt("aa5555", 16),
+					timestamp: new Date().toISOString()
+				}});
+			} catch(e) {
+				console.log(e);
+				return "Couldn't send the requester the denial notification; please make sure they're aware that their server was denied"
 			}
-			msg.channel.createMessage("The sync request has been denied");
-		} else msg.channel.createMessage("Something went wrong while updating the request. Please try again");
+		}
+
+		return "The sync request has been denied!";
 	},
 	guildOnly: true,
 	permissions: ["manageMessages"]
@@ -259,13 +253,17 @@ module.exports.subcommands.enable = {
 	help: ()=> "[Re-]enables syncing behavior",
 	usage: ()=> [" - Starts up sync notifications and allows others to sync to your server"],
 	execute: async (bot, msg, args) => {
-		var cfg = await bot.utils.getSyncConfig(bot, msg.guild.id);
-		if(!cfg || !cfg.sync_notifs) return msg.channel.createMessage("Please run `hub!sync notifs [channel]` before enabling syncing");
-		if(cfg.enabled) return msg.channel.createMessage("Syncing is already enabled!");
+		var cfg = await bot.stores.syncConfigs.get(msg.guild.id);
+		if(!cfg || !cfg.sync_notifs) return "Please run `ha!sync notifs [channel]` before enabling syncing";
+		if(cfg.enabled) return "Syncing is already enabled!";
 
-		var scc = await bot.utils.updateSyncConfig(bot, msg.guild.id, {enabled: true});
-		if(scc) msg.channel.createMessage("Syncing enabled!");
-		else msg.channel.createMessage("Something went wrong");
+		try {
+			await bot.stores.syncConfigs.update(msg.guild.id, {enabled: true});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+		
+		return "Syncing enabled!";
 	},
 	guildOnly: true,
 	permissions: ["manageMessages"]
@@ -275,12 +273,16 @@ module.exports.subcommands.disable = {
 	help: ()=> "Temporarily stops syncing behavior",
 	usage: ()=> [" - Stops others from syncing to your server and stops your server from sending sync notifications"],
 	execute: async (bot, msg, args) => {
-		var cfg = await bot.utils.getSyncConfig(bot, msg.guild.id);
-		if(!cfg.enabled) return msg.channel.createMessage("Syncing is already disabled!");
+		var cfg = await bot.stores.syncConfigs.get(msg.guild.id);
+		if(!cfg || !cfg.enabled) return "Syncing is already disabled!";
 
-		var scc = await bot.utils.updateSyncConfig(bot, msg.guild.id, {enabled: false});
-		if(scc) msg.channel.createMessage("Syncing disabled!");
-		else msg.channel.createMessage("Something went wrong");
+		try {
+			await bot.stores.syncConfigs.update(msg.guild.id, {enabled: false});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+		
+		return "Syncing disabled!";
 	},
 	guildOnly: true,
 	permissions: ["manageMessages"]
@@ -288,15 +290,21 @@ module.exports.subcommands.disable = {
 
 module.exports.subcommands.notification = {
 	help: ()=> "Sets the channel for sync notifications from a host server, or for those looking to sync with your server",
-	usage: ()=> [" [channel] - Sets the sync notifs channel"],
+	usage: ()=> [" <channel> - Sets the sync notifs channel. Uses current channel if one is not given"],
 	desc: ()=> "The channel can be a #channel, ID, or channel-name",
 	execute: async (bot, msg, args) => {
-		var channel = msg.guild.channels.find(ch => (ch.name == args[0].toLowerCase() || ch.id == args[0].replace(/[<#>]/g,"")) && ch.type == 0);
-		if(!channel) return msg.channel.createMessage("Couldn't find that channel");
+		var channel;
+		if(!args[0]) channel = msg.channel; 
+		else channel = msg.guild.channels.find(ch => (ch.name == args[0].toLowerCase() || ch.id == args[0].replace(/[<#>]/g,"")) && ch.type == 0);
+		if(!channel) return "Channel not found";
 
-		var scc = await bot.utils.updateSyncConfig(bot, msg.guild.id, {sync_notifs: channel.id});
-		if(scc) msg.channel.createMessage("Channel set! You can now allow others to sync to your server, or sync with another server");
-		else msg.channel.createMessage("Something went wrong");
+		try {
+			await bot.stores.syncConfigs.update(msg.guild.id, {sync_notifs: channel.id});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+		
+		return "Channel set! You can now allow others to sync to your server, or sync with another server";
 	},
 	alias: ["notif", "notifications", "notifs"],
 	guildOnly: true,
@@ -307,8 +315,8 @@ module.exports.subcommands.setup = {
 	help: ()=> "Runs a setup menu for your server",
 	usage: ()=> " - Runs the syncing setup menu",
 	execute: async (bot, msg, args) => {
-		var cfg = await bot.utils.getSyncConfig(bot, msg.guild.id);
-		if(cfg && (cfg.sync_id && !cfg.confirmed)) return msg.channel.createMessage("You already have a pending sync request out. Please wait to change sync settings until after that request goes through, or cancel it first");
+		var cfg = await bot.stores.syncConfigs.get(msg.guild.id);
+		if(cfg && (cfg.sync_id && !cfg.confirmed)) return "You already have a pending sync request out. Please wait to change sync settings until after that request goes through, or cancel it first";
 		var resp;
 		var schan;
 		var bchan;
@@ -322,37 +330,44 @@ module.exports.subcommands.setup = {
 			"```"
 		].join("\n"));
 		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time: 30000, maxMatches: 1});
-		if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
+		if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
 		switch(resp[0].content) {
 			case "1":
 				if(cfg && cfg.syncable) {
 					await msg.channel.createMessage("WARNING: Syncing your guild with another guild will stop others from syncing with yours. Are you sure you want to do this? (y/n)");
 					var resp;
 					var resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {maxMatches: 1, time: 30000});
-					if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
-					if(!["y","yes"].includes(resp[0].content.toLowerCase())) return msg.channel.createMessage("Action cancelled");
+					if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
+					if(!["y","yes"].includes(resp[0].content.toLowerCase())) return "Action cancelled";
 
-					var unsync = await bot.utils.unsyncServers(bot, msg.guild.id);
-					if(!unsync) return msg.channel.createMessage("Something went wrong while unsyncing servers synced to yours. Please try again");
+					try {
+						var synced = await bot.stores.syncConfigs.getSynced(msg.guild.id);
+						for(var snc of synced) {
+							await bot.createMessage(snc.sync_notifs, "Your synced server is no longer syncable. You will no longer receive sync notifications unless you sync to another server");
+						}
+						await bot.stores.syncConfigs.unsync(msg.guild.id);
+					} catch(e) {
+						return "ERR while unsyncing servers: " + (e.message || e);
+					}
 				}
 
 				await msg.channel.createMessage("Please enter the ID of the server you would like to sync with");
 				resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time: 60000, maxMatches: 1});
-				if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
-				sguild = await bot.utils.getSyncConfig(bot, resp[0].content);;
-				if(!sguild || !sguild.syncable || !sguild.enabled) return msg.channel.createMessage("ERR: either I'm not in that server or that server cannot be synced with. Aborting");
+				if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
+				sguild = await bot.stores.syncConfigs.get(resp[0].content);;
+				if(!sguild || !sguild.syncable || !sguild.enabled) return "ERR: either I'm not in that server or that server cannot be synced with. Aborting";
 
 				await msg.channel.createMessage("Please enter a channel for sync notifications. These are the notifications you'll get when your sync request is accepted or denied");
 				resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time: 60000, maxMatches: 1});
-				if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
+				if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
 				schan = msg.guild.channels.find(ch => (ch.name == resp[0].content.toLowerCase() || ch.id == resp[0].content.replace(/[<#>]/g,"")) && ch.type == 0);
-				if(!schan) return msg.channel.createMessage("ERR: couldn't find the given channel. Aborting");
+				if(!schan) return "ERR: couldn't find the given channel. Aborting";
 
 				await msg.channel.createMessage("Please enter a channel for ban notifications. These are the notifications you'll get when members in your server are banned in the synced server, or when members you have banned are unbanned there");
 				resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time: 60000, maxMatches: 1});
-				if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
+				if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
 				bchan = msg.guild.channels.find(ch => (ch.name == resp[0].content.toLowerCase() || ch.id == resp[0].content.replace(/[<#>]/g,"")) && ch.type == 0);
-				if(!bchan) return msg.channel.createMessage("ERR: couldn't find the given channel. Aborting");
+				if(!bchan) return "ERR: couldn't find the given channel. Aborting";
 
 				var date = new Date();
 				try {
@@ -372,7 +387,7 @@ module.exports.subcommands.setup = {
 					}})
 				} catch(e) {
 					console.log(e);
-					return msg.channel.createMessage("Something went wrong when sending a confirmation to that guild. Please contact the guild's admins and make sure their `sync_notifs` channel exists and that I can message it");
+					return "Something went wrong when sending a confirmation to that guild. Please contact the guild's admins and make sure their `sync_notifs` channel exists and that I can message it";
 				}
 				try {
 					["✅","❌"].forEach(r => message.addReaction(r));
@@ -382,88 +397,78 @@ module.exports.subcommands.setup = {
 					message.channel.createMessage("(Couldn't add the reactions- make sure I have the `addReactions` permission! Reactions from mods should still work, however)");
 				}
 				
-				var scc = await bot.utils.addSyncMenu(bot, message.guild.id, message.channel.id, message.id, 0, msg.guild.id, schan.id);
-				var scc2 = await bot.utils.updateSyncConfig(bot, msg.guild.id, {syncable: false, confirmed: false, sync_id: sguild.server_id, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
-
-				if(scc && scc2) msg.channel.createMessage("Confirmation sent! You'll get a notification when they accept/deny it");
-				else if(!scc && scc2) {
-					msg.channel.createMessage("Something went wrong when inserting the confirmation into the database. However, this request can still be manually confirmed using `hub!sync accept` and `hub!sync deny`");
-				} else if(scc && !scc2) msg.channel.createMessage("Couldn't update your sync config. This request can still be confirmed, however");
-				else {
-					msg.channel.createMessage("Couldn't add the sync menu or update your sync config, thus this sync attempt cannot be completed. Please try again");
-					await message.edit({embed: {
-						title: "Sync Request",
-						description: ["Someone has requested to sync to your server!\n",
-									  `UPDATE: Something went wrong when handling this sync request. This request cannot be accepted or denied.`].join(""),
-						fields: [
-							{name: "Requesting Server", value: `${msg.guild.name} (${msg.guild.id})`},
-							{name: "Requesting User", value: `${msg.author.username}#${msg.author.discriminator} (${msg.author.id})`},
-							{name: "Current Status", value: "ERROR"}
-						],
-						color: parseInt("aa5555", 16),
-						footer: {
-							text: `Requester ID: ${msg.guild.id}`
-						},
-						timestamp: date.toISOString()
-					}})
+				try {
+					await bot.stores.syncMenus.create(message.guild.id, message.channel.id, message.id, {type: 0, reply_guild: msg.guild.id, reply_channel: schan.id});
+					await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: sguild.server_id, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
+				} catch(e) {
+					return "ERR: "+e;
 				}
+
+				return "Confirmation sent! You'll get a notification when they accept/deny it";
 				break;
 			case "2":
 				if(cfg && cfg.sync_id && cfg.confirmed) {
 					await msg.channel.createMessage("WARNING: Allowing others to sync with your guild will terminate your current sync link. Are you sure you want to do this? (y/n)");
 					resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {maxMatches: 1, time: 30000});
-					if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
-					if(!["y","yes"].includes(resp[0].content.toLowerCase())) return msg.channel.createMessage("Action cancelled");
+					if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
+					if(!["y","yes"].includes(resp[0].content.toLowerCase())) return "Action cancelled";
 
-					var req = await bot.utils.getSyncRequest(bot, cfg.sync_id, msg.guild.id);
-						if(req && req.message) {
-							try {
-								var oldmessage = await bot.getMessage(req.channel, req.message);
-								if(oldmessage) {
-									var embed = oldmessage.embeds[0];
-									embed.fields[2].value = "Cancelled";
-									embed.color = parseInt("aa5555",16);
-									embed.author = {
-										name: `Cancelled by: ${msg.author.username}#${msg.author.discriminator} (${msg.author.id})`,
-										icon_url: msg.author.avatarURL
-									}
-									await bot.editMessage(req.channel, req.message, {embed: embed});
-									await bot.utils.deleteSyncMenu(bot, oldmessage.channel.guild.id, oldmessage.channel.id, oldmessage.id);
-
-									oldmessage.channel.createMessage({embed: {
-										title: "Sync Cancellation",
-										description: `The sync request from ${msg.guild.name} (${msg.guild.id}) has been cancelled.`,
-										color: parseInt("aa5555", 16),
-										timestamp: new Date().toISOString()
-									}});
+					var req = await bot.stores.syncMenus.getRequest(cfg.sync_id, msg.guild.id);
+					if(req && req.message) {
+						try {
+							var oldmessage = await bot.getMessage(req.channel, req.message);
+							if(oldmessage) {
+								var embed = oldmessage.embeds[0];
+								embed.fields[2].value = "Cancelled";
+								embed.color = parseInt("aa5555",16);
+								embed.author = {
+									name: `Cancelled by: ${msg.author.username}#${msg.author.discriminator} (${msg.author.id})`,
+									icon_url: msg.author.avatarURL
 								}
-							} catch(e) {
-								console.log(e);
-								msg.channel.createMessage("Your sync cancellation couldn't be sent to the synced server. However, you can still be unsynced")
-							}
+								await bot.editMessage(req.channel, req.message, {embed: embed});
+								await bot.stores.syncMenus.delete(oldmessage.channel.guild.id, oldmessage.channel.id, oldmessage.id);
 
-							var unsync = await bot.utils.updateSyncConfig(bot, msg.guild.id, {syncable: false, confirmed: false, sync_id: ""});
-							if(!unsync) return msg.channel.createMessage("Something went wrong while trying to cancel your existing sync request. Please try again");
+								oldmessage.channel.createMessage({embed: {
+									title: "Sync Cancellation",
+									description: `The sync request from ${msg.guild.name} (${msg.guild.id}) has been cancelled.`,
+									color: parseInt("aa5555", 16),
+									timestamp: new Date().toISOString()
+								}});
+							}
+						} catch(e) {
+							console.log(e);
+							msg.channel.createMessage("Your sync cancellation couldn't be sent to the synced server. However, you can still be unsynced")
 						}
+
+						try {
+							await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: ""});
+						} catch(e) {
+							return "ERR: "+e;
+						}
+					}
 				}
 				await msg.channel.createMessage("Please enter a channel for sync notifications. These are the notifications you'll get when others request to sync with you");
 				resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time: 60000, maxMatches: 1});
-				if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting");
+				if(!resp || !resp[0]) return "ERR: timed out. Aborting";
 				schan = msg.guild.channels.find(ch => (ch.name == resp[0].content.toLowerCase() || ch.id == resp[0].content.replace(/[<#>]/g,"")) && ch.type == 0);
-				if(!schan) return msg.channel.createMessage("ERR: couldn't find the given channel. Aborting");
+				if(!schan) return "ERR: couldn't find the given channel. Aborting";
 
 				await msg.channel.createMessage("Please enter a channel for ban notifications. These are the notifications you'll get when a server synced with yours bans a user");
 				resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time: 60000, maxMatches: 1});
-				if(!resp || !resp[0]) return msg.channel.createMessage("ERR: timed out. Aborting...");
+				if(!resp || !resp[0]) return "ERR: timed out. Aborting...";
 				bchan = msg.guild.channels.find(ch => (ch.name == resp[0].content.toLowerCase() || ch.id == resp[0].content.replace(/[<#>]/g,"")) && ch.type == 0);
-				if(!bchan) return msg.channel.createMessage("ERR: couldn't find the given channel. Aborting");
+				if(!bchan) return "ERR: couldn't find the given channel. Aborting";
 
-				var scc = await bot.utils.updateSyncConfig(bot, msg.guild.id, {syncable: true, confirmed: false, sync_id: "", sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
-				if(scc) msg.channel.createMessage("Syncing enabled!");
-				else msg.channel.createMessage("Something went wrong");
+				try {
+					await bot.stores.syncConfigs.update(msg.guild.id, {syncable: true, confirmed: false, sync_id: "", sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
+				} catch(e) {
+					return "ERR: "+e;
+				}
+				
+				return "Syncing enabled!";
 				break;
 			default:
-				msg.channel.createMessage("ERR: invalid input. Aborting");
+				return "ERR: invalid input. Aborting";
 				break;
 		}
 	},
@@ -476,10 +481,10 @@ module.exports.subcommands.cancel = {
 	usage: ()=> [" - Cancels/terminates your current sync setup"],
 	desc: ()=> "This command can be used to cancel syncing at any time.",
 	execute: async (bot, msg, args) => {
-		var cfg = await bot.utils.getSyncConfig(bot, msg.guild.id);
-		if(!cfg || !cfg.sync_id) return msg.channel.createMessage("Nothing to cancel");
+		var cfg = await bot.stores.syncConfigs.get(msg.guild.id);
+		if(!cfg || !cfg.sync_id) return "Nothing to cancel";
 
-		var request = await bot.utils.getSyncRequest(bot, cfg.sync_id, msg.guild.id);
+		var request = await bot.stores.syncMenus.getRequest(cfg.sync_id, msg.guild.id);
 
 		if(request && request.message) {
 			var message;
@@ -495,7 +500,7 @@ module.exports.subcommands.cancel = {
 							icon_url: msg.author.avatarURL
 						}
 						await bot.editMessage(req.channel, req.message, {embed: embed});
-						await bot.utils.deleteSyncMenu(bot, message.channel.guild.id, message.channel.id, message.id);
+						await bot.stores.syncMenus.delete(message.channel.guild.id, message.channel.id, message.id);
 
 						await message.channel.createMessage({embed: {
 							title: "Sync Cancellation",
@@ -503,7 +508,6 @@ module.exports.subcommands.cancel = {
 							color: parseInt("aa5555", 16),
 							timestamp: new Date().toISOString()
 						}});
-						await bot.utils.deleteSyncMenu(bot, message.channel.guild.id, message.channel.id, message.id);
 					}
 				}
 			} catch(e) {
@@ -512,9 +516,13 @@ module.exports.subcommands.cancel = {
 			}
 		}
 
-		var scc = await bot.utils.updateSyncConfig(bot, msg.guild.id, {confirmed: false, sync_id: ""});
-		if(scc) msg.channel.createMessage(`Sync ${cfg.confirmed ? "terminated" : "cancelled"}!`)
-		else msg.channel.createMessage("Something went wrong while updating the request. Please try again");
+		try {
+			await bot.stores.syncConfigs.update(msg.guild.id, {confirmed: false, sync_id: ""});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+		
+		return `Sync ${cfg.confirmed ? "terminated" : "cancelled"}!`
 	},
 	guildOnly: true,
 	permissions: ["manageMessages"]

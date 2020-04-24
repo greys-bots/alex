@@ -8,6 +8,23 @@ class ListingLogStore extends Collection {
 		this.bot = bot;
 	};
 
+	async init() {
+		this.bot.on("messageDelete", async (msg) => {
+			return new Promise(async (res, rej) => {
+				if(msg.channel.type == 1) return;
+
+				try {
+					var log = await this.get(msg.channel.guild.id, msg.channel.id, msg.id);
+					if(!log) return;
+					await this.delete(log.server_id, log.hid);
+				} catch(e) {
+					console.log(e);
+					return rej(e.message || e);
+				}
+			})	
+		})
+	}
+
 	async create(server, hid, data = {}) {
 		return new Promise(async (res, rej) => {
 			try {
@@ -32,6 +49,30 @@ class ListingLogStore extends Collection {
 		})
 	}
 
+	async index(server, hid, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO listing_logs (
+					hid,
+					server_id,
+					channel_id,
+					message_id,
+					server_name,
+					reason,
+					timestamp,
+					type
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+				[hid, server, data.channel_id || "", data.message_id || "", data.server_name || "",
+				 data.reason || "", data.timestamp || new Date().toISOString(), data.type || 0]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
+		})
+	}
+
 	async get(server, hid, forceUpdate = false) {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
@@ -40,7 +81,7 @@ class ListingLogStore extends Collection {
 			}
 
 			try {
-				var data = await this.db.query(`SELECT FROM listing_logs WHERE server_id = $1 AND hid = $2`,[server, hid]);
+				var data = await this.db.query(`SELECT * FROM listing_logs WHERE server_id = $1 AND hid = $2`,[server, hid]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -66,7 +107,7 @@ class ListingLogStore extends Collection {
 	async getByMessage(server, channel, message) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`SELECT FROM listing_logs WHERE server_id = $1 AND channel_id = $2 AND message_id = $3`, [server, channel, message]);
+				var data = await this.db.query(`SELECT * FROM listing_logs WHERE server_id = $1 AND channel_id = $2 AND message_id = $3`, [server, channel, message]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -92,7 +133,7 @@ class ListingLogStore extends Collection {
 	async getAll(server) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`SELECT FROM listing_logs WHERE server_id = $1`, [server]);
+				var data = await this.db.query(`SELECT * FROM listing_logs WHERE server_id = $1`, [server]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -106,7 +147,7 @@ class ListingLogStore extends Collection {
 					try {
 						message = await this.bot.getMessage(data.rows[i].channel_id, data.rows[i].message_id);
 					} catch(e) {
-						console.log(e.stack);
+						console.log(e.message);
 						await this.delete(server, data.rows[i].hid);
 						continue;
 					}
@@ -115,6 +156,7 @@ class ListingLogStore extends Collection {
 					logs.push(data.rows[i]);
 				}
 
+				console.log(logs);
 				res(logs);
 			} else res(undefined)
 		})
@@ -154,19 +196,13 @@ class ListingLogStore extends Collection {
 	async delete(server, hid) {
 		return new Promise(async (res, rej) => {
 			try {
-				var ban = await this.get(server, hid);
-			} catch(e) {
-				return rej(e);
-			}
-
-			try {
-				this.db.query(`DELETE FROM ban_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
+				var data = await this.db.query(`SELECT * FROM listing_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
+				await this.db.query(`DELETE FROM listing_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
 				super.delete(`${server}-${hid}`);
-				this.bot.stores.receipts.delete(server, hid);
-				await this.bot.deleteMessage(ban.channel_id, ban.message_id);
+				if(data.rows && data.rows[0]) await this.bot.deleteMessage(data.rows[0].channel_id, data.rows[0].message_id);
 			} catch(e) {
 				console.log(e);
-				return rej(e.message || e);
+				if(!e.message.includes("Unknown Message")) return rej(e.message);
 			}
 
 			res();
@@ -182,7 +218,7 @@ class ListingLogStore extends Collection {
 			}
 
 			try {
-				this.db.query(`DELETE FROM ban_logs WHERE server_id = $1`, [server]);
+				this.db.query(`DELETE FROM listing_logs WHERE server_id = $1`, [server]);
 				for(var log of logs) {
 					super.delete(`${server}-${log.hid}`);
 					this.bot.stores.receipts.delete(server, log.hid);

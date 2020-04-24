@@ -31,6 +31,29 @@ class SyncConfigStore extends Collection {
 		})
 	}
 
+	async index(server, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO sync (
+					server_id,
+					sync_id,
+					confirmed,
+					syncable,
+					sync_notifs,
+					ban_notifs,
+					enabled
+				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				[server, data.sync_id, data.confirmed || false, data.syncable || false,
+				data.sync_notifs, data.ban_notifs, data.enabled || false]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
+		})
+	}
+
 	async get(server, forceUpdate = false) {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
@@ -39,7 +62,7 @@ class SyncConfigStore extends Collection {
 			}
 
 			try {
-				await this.db.query(`SELECT * FROM sync WHERE server_id = $1`,[server]);
+				var data = await this.db.query(`SELECT * FROM sync WHERE server_id = $1`,[server]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);

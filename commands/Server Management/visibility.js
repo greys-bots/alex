@@ -3,17 +3,31 @@ module.exports = {
 	usage: ()=> [" [serverID] [(true|1) | (false|0)] - Sets a server's visibility for the website"],
 	desc: ()=> "**This is not currently necessary to do**",
 	execute: async (bot, msg, args) => {
-		if(!args[1]) return msg.channel.createMessage("Please provide a server ID and a value to set visibility to");
+		var guild = await bot.stores.servers.get(msg.guild.id, args[0]);
+		if(!guild) return "Server not found!";
 
-		var guild = await bot.utils.getServer(bot, args[0]);
-		if(!guild) return msg.channel.createMessage("Server not found");
+		if(!args[1]) return `Current state: ${guild.visibility ? "Visibile" : "Not visible"}`;
 
-		var scc;
-		if(["true", "1"].includes(args[1])) scc = await bot.utils.updateHostedServer(bot, msg.guild.id, guild.server_id, {visibility: true});
-		else scc = await bot.utils.updateHostedServer(bot, msg.guild.id, guild.server_id, {visibility: false});
+		try {
+			switch(args[1].toLowerCase()) {
+				case "true":
+				case "1":
+					guild = await bot.stores.servers.update(msg.guild.id, guild.server_id, {visibility: true});
+					break;
+				case "false":
+				case "0":
+					guild = await bot.stores.servers.update(msg.guild.id, guild.server_id, {visibility: false});
+					break;
+				default:
+					return "That value is invalid";
+					break;
+			}
+			await bot.stores.serverPosts.updateByHostedServer(msg.guild.id, guild.server_id, guild);
+		} catch(e) {
+			return "ERR: "+e;
+		}
 
-		if(scc) msg.channel.createMessage("Visibility set!");
-		else msg.channel.createMessage("Something went wrong");
+		return "Visibility set!";
 	},
 	guildOnly: true,
 	alias: ["vis"],

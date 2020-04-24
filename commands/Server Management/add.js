@@ -10,23 +10,24 @@ module.exports = {
 			invite = await bot.getInvite(id);
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Couldn't get that invite");
+			return "ERR: "+e.message;
 		}
 		
-		var exists = await bot.utils.getServer(bot, msg.guild.id, invite.guild.id);
-		if(exists) return msg.channel.createMessage("Server already exists!");
+		var exists = await bot.stores.servers.get(msg.guild.id, invite.guild.id);
+		if(exists) return "Server already exists!";
 
-		var scc = await bot.utils.addServer(
-				bot,
-				msg.guild.id,
-				invite.guild.id,
-				invite.guild.name, 
-				"https://discord.gg/"+invite.code,
-				`https://cdn.discordapp.com/icons/${invite.guild.id}/${invite.guild.icon}.jpg?size=128`
-		);
-		if(scc) msg.channel.createMessage("Server added! ID: "+invite.guild.id);
-		else msg.channel.createMessage("Something went wrong")
+		try {
+			await bot.stores.servers.create(msg.guild.id, invite.guild.id, {
+				name: invite.guild.name, 
+				invite: "https://discord.gg/"+invite.code,
+				pic_url: `https://cdn.discordapp.com/icons/${invite.guild.id}/${invite.guild.icon}.jpg?size=128`
+			});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "Server added! ID: "+invite.guild.id;
 	},
-	permissions: ["manageMessages"], //so basic mods can help
+	permissions: ["manageMessages"],
 	guildOnly: true
 }

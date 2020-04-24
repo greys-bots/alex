@@ -10,13 +10,13 @@ module.exports = {
 				"$SERVER.NAME - Your server's name"].join("\n"),
 	execute: async (bot, msg, args)=> {
 		var conf = await bot.stores.configs.get(msg.guild.id);
-		if(!conf) return msg.channel.createMessage('Config not found.');
+		if(!conf) return 'Config not found.';
 
 		var bchan = conf.banlog_channel ? msg.guild.channels.find(c => c.id == conf.banlog_channel) : undefined;
 		var rrole = conf.reprole ?  msg.guild.roles.find(rl => rl.id == conf.reprole) : undefined;
 		var dchan = conf.delist_channel ? msg.guild.channels.find(ch => ch.id == conf.delist_channel) : undefined;
 
-		msg.channel.createMessage({embed: {
+		return {embed: {
 			title: "Server Config",
 			fields: [
 				{name: "Ban Log Channel", value: bchan ? bchan.mention : "(not set)"},
@@ -24,7 +24,7 @@ module.exports = {
 				{name: "Delist/Denial Log Channel", value: dchan ? dchan.mention : "(not set)"},
 				{name: "Representative Role", value: rrole ? rrole.mention : "(not set)"}
 			]
-		}})
+		}};
 	},
 	alias: ['conf','cfg'],
 	subcommands: {},
@@ -36,14 +36,18 @@ module.exports.subcommands.banlog = {
 	help: ()=> "Sets banlog channel",
 	usage: ()=> [" [channel] - Sets banlog channel for the server (NOTE: can be channel ID, channel mention, or channel name"],
 	execute: async (bot, msg, args)=> {
-		if(!args[0]) return msg.channel.createMessage('Please provide a channel.');
+		if(!args[0]) return 'Please provide a channel.';
+
+		var cfg = await bot.stores.configs.get(msg.guild.id);
+
 		var chan = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
-		if(!chan) return msg.channel.createMessage("Channel not found");
+		if(!chan) return "Channel not found";
 
-		var scc = await bot.stores.configs.update(msg.guild.id, {banlog_channel: chan.id});
-		if(scc) msg.channel.createMessage("Banlog channel set!");
-		else msg.channel.createMessage("Something went wrong");
-
+		var scc;
+		if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {banlog_channel: chan.id});
+		else scc = await bot.stores.configs.create(msg.guild.id, {banlog_channel: chan.id});
+		if(scc) return "Banlog channel set!";
+		else return "Something went wrong";
 	},
 	alias: ['banchannel', "banlogs", "banlogchannel"],
 	permissions: ["manageMessages"],
@@ -55,9 +59,13 @@ module.exports.subcommands.banmsg = {
 	usage: ()=> [" [message] - Set the message"],
 	desc: ()=> "This is NOT the message that appears when a member is banned. This will be DM'd to a user that is banned as long as they are in the server when the ban happened.\nAvailable message vars:\n$REASON - The reason the user was banned",
 	execute: async (bot, msg, args) => {
-		var scc = await bot.stores.configs.update(msg.guild.id, {ban_message: args.join(" ")});
-		if(scc) msg.channel.createMessage("Ban message set!");
-		else msg.channel.createMessage("Something went wrong");
+		var cfg = await bot.stores.configs.get(msg.guild.id);
+
+		var scc;
+		if(cfg) scc = await await bot.stores.configs.update(msg.guild.id, {ban_message: args.join(" ")});
+		else scc = await await bot.stores.configs.create(msg.guild.id, {ban_message: args.join(" ")});
+		if(scc) return "Ban message set!";
+		else return "Something went wrong";
 	},
 	alias: ["banmessage","bm","banlogmessage","banlogmsg"],
 	permissions: ["manageGuild"],
@@ -68,13 +76,18 @@ module.exports.subcommands.reprole = {
 	help: ()=> "Sets server rep role",
 	usage: ()=> [" [role] - Sets rep role for the server (NOTE: can be role ID, role mention, or role name"],
 	execute: async (bot, msg, args)=> {
-		if(!args[0]) return msg.channel.createMessage('Please provide a channel.');
-		var role = msg.guild.roles.find(rl => rl.id == args[0].replace(/[<&>]/g,"") || rl.name.toLowerCase() == args.join(" ").toLowerCase());
-		if(!role) return msg.channel.createMessage("Role not found");
+		if(!args[0]) return 'Please provide a channel.';
 
-		var scc = await bot.stores.configs.update(msg.guild.id, {reprole: role.id});
-		if(scc) msg.channel.createMessage("Representative role set!");
-		else msg.channel.createMessage("Something went wrong");
+		var cfg = await bot.stores.configs.get(msg.guild.id);
+
+		var role = msg.guild.roles.find(rl => rl.id == args[0].replace(/[<&>]/g,"") || rl.name.toLowerCase() == args.join(" ").toLowerCase());
+		if(!role) return "Role not found";
+
+		var scc;
+		if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {reprole: role.id});
+		else scc = await bot.stores.configs.create(msg.guild.id, {reprole: role.id});
+		if(scc) return "Representative role set!";
+		else return "Something went wrong";
 	},
 	permissions: ["manageMessages"],
 	guildOnly: true
@@ -84,13 +97,18 @@ module.exports.subcommands.delist = {
 	help: ()=> "Sets delist channel",
 	usage: ()=> [" [channel] - Sets delist channel for the server (NOTE: can be channel ID, channel mention, or channel name"],
 	execute: async (bot, msg, args)=> {
-		if(!args[0]) return msg.channel.createMessage('Please provide a channel.');
-		var chan = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
-		if(!chan) return msg.channel.createMessage("Channel not found");
+		if(!args[0]) return 'Please provide a channel.';
 
-		var scc = await bot.stores.configs.update(msg.guild.id, {delist_channel: chan.id});
-		if(scc) msg.channel.createMessage("Delist channel set!");
-		else msg.channel.createMessage("Something went wrong");
+		var cfg = await bot.stores.configs.get(msg.guild.id);
+
+		var chan = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
+		if(!chan) return "Channel not found";
+
+		var scc;
+		if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {delist_channel: chan.id});
+		else scc = await bot.stores.configs.create(msg.guild.id, {delist_channel: chan.id});
+		if(scc) return "Delist channel set!";
+		else return "Something went wrong";
 
 	},
 	alias: ['delistchannel', "delete", "delisting", "deletechannel", "denychannel", "deny"],

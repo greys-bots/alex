@@ -7,14 +7,14 @@ module.exports = {
 				 " delete [commandname] - Delete a custom command"],
 	execute: async (bot, msg, args) => {
 		var cmds = await bot.stores.customCommands.getAll(msg.guild.id);
-		if(!cmds) return msg.channel.createMessage("No custom commands registered for this server");
-		console.log(cmds);
-		msg.channel.createMessage({
+		if(!cmds) return "No custom commands registered for this server";
+
+		return {
 			embed: {
 				title: "Custom commands",
 				description: cmds.map(c => c.name).join("\n")
 			}
-		})
+		}
 	},
 	subcommands: {},
 	alias: ["cc", "custom"],
@@ -34,50 +34,51 @@ module.exports.subcommands.add = {
 		var done = false;
 		await msg.channel.createMessage("Enter a name for the command.");
 		try {
-		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.replace("\s","").toLowerCase();
+			response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.replace(/\s/g,"").toLowerCase();
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Action cancelled: timed out");
+			return "Action cancelled: timed out";
 		}
 		var cmd = await bot.stores.customCommands.get(msg.guild.id, response);
-		if(cmd || bot.commands[response]) return msg.channel.createMessage("ERR: Command with that name exists. Aborting");
+		if(cmd || bot.commands.get(bot.aliases.get(response))) return "ERR: Command with that name exists. Aborting";
 		name = response;
 
 		await msg.channel.createMessage(`Who is the target of the command?
-			\`\`\`
-			user - the person that used the command
-			args - people specified through arguments (using member IDs)
-			\`\`\`
+		\`\`\`
+		user - the person that used the command
+		args - people specified through arguments (using member IDs)
+		\`\`\`
 		`)
 		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 
 		if(response == "user") target = "member";
 		else if(response == "args") target = "args";
-		else return msg.channel.createMessage("ERR: Invalid target. Aborting");
+		else return "ERR: Invalid target. Aborting";
 
 		try {
 			for(var i = 0; i < 5; i++) {
 				if(done) break;
-				await msg.channel.createMessage(`Action number: ${actions.length+1}/5\nAvailable actions:
-					\`\`\`
-					rr - remove a role
-					ar - add a role
-					bl - blacklist user from using the bot
-					\`\`\`
-				Type "finished" to end action adding`);
+				await msg.channel.createMessage(`
+				Action number: ${actions.length+1}/5\nAvailable actions:
+				\`\`\`
+				rr - remove a role
+				ar - add a role
+				bl - blacklist user from using the bot
+				\`\`\`
+				Type \`finished\` to end action adding`);
 
 				response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 				switch(response) {
 					case "rr":
 						await msg.channel.createMessage("Type the name of the role you want to remove.")
 						response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
-						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return msg.channel.createMessage("ERR: Role not found. Aborting");
+						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return "ERR: Role not found. Aborting";
 						actions.push({type: "rr", action: `${target}.rr(rf('${response}'))`})
 						break;
 					case "ar":
 						await msg.channel.createMessage("Type the name of the role you want to add.")
 						response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
-						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return msg.channel.createMessage("ERR: Role not found. Aborting");
+						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return "ERR: Role not found. Aborting";
 						actions.push({type: "rr", action:`${target}.ar(rf('${response}'))`})
 						break;
 					case "bl":
@@ -87,7 +88,7 @@ module.exports.subcommands.add = {
 						done = true;
 						break;
 					default:
-						return msg.channel.createMessage("ERR: Invalid action. Aborting");
+						return "ERR: Invalid action. Aborting";
 						break;
 				}
 
@@ -102,10 +103,10 @@ module.exports.subcommands.add = {
 				}
 			}
 		} catch(e) {
-			return msg.channel.createMessage("Action cancelled: timed out");
+			return "Action cancelled: timed out";
 		}
 
-		if(actions.length == 0) return msg.channel.createMessage("ERR: No actions added. Aborting");
+		if(actions.length == 0) return "ERR: No actions added. Aborting";
 
 		await msg.channel.createMessage("Would you like the user's message to be deleted? (y/n)");
 		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
@@ -122,13 +123,17 @@ module.exports.subcommands.add = {
 		}})
 
 		response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
-		if(response != "y") return msg.channel.createMessage("Action aborted");
+		if(response != "y") return "Action aborted";
 
-		var scc = await bot.stores.customCommands.create(msg.guild.id, name, {actions, target, del});
-		if(scc) msg.channel.createMessage("Custom command added!");
-		else msg.channel.createMessage("Something went wrong");
-		// msg.channel.createMessage("This command is currently under construction. However, manual database editing can be used to create custom commands. USE WITH EXTREME CAUTION.")
+		try {
+			await bot.stores.customCommands.create(msg.guild.id, name, {actions, target, del});
+		} catch(e) {
+			return e;
+		}
+
+		return "Custom command added!";
 	},
+	alias: ['create', 'new'],
 	permissions: ["manageGuild"],
 	guildOnly: true
 }
@@ -137,14 +142,20 @@ module.exports.subcommands.delete = {
 	help: ()=> "Delete a custom command",
 	usage: ()=> [" [cmdName] - Deletes the given command"],
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a command to delete");
+		if(!args[0]) return "Please provide a command to delete";
 
 		var cmd = await bot.stores.customCommands.get(msg.guild.id, args[0]);
-		if(!cmd) return msg.channel.createMessage("Command does not exist");
+		if(!cmd) return "Command does not exist";
 
-		var scc = await bot.stores.customCommands.delete(msg.guild.id, args[0]);
-		if(scc) msg.channel.createMessage("Command deleted!");
-		else msg.channel.createMessage("Something went wrong");
+		try {
+			await bot.stores.customCommands.delete(msg.guild.id, args[0]);
+		} catch(e) {
+			return e;
+		}
+
+		return "Command deleted!";
 	},
-	guildOnly: true
+	alias: ['remove'],
+	guildOnly: true,
+	permissions: ["manageGuild"]
 }

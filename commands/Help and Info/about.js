@@ -2,7 +2,7 @@ module.exports = {
 	help: ()=> "A bit about the bot",
 	usage: ()=> [" - What it says on the tin"],
 	execute: async (bot, msg, args) => {
-		return msg.channel.createMessage({embed: {
+		return {embed: {
 			title: "About the bot",
 			description: "Hi! I'm Alex! :D\nI'm a heavy lifter bot for hub servers-"+
 						 " meaning I do all the hard work so you don't have to!"+
@@ -16,7 +16,7 @@ module.exports = {
 				{name: "Want to support the creators?", value: "[Patreon](https://patreon.com/greysdawn) | [Ko-Fi](https://ko-fi.com/greysdawn)"}
 			]
 
-		}})
+		}};
 	},
 	alias: ["a", "abt"]
 }

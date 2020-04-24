@@ -6,17 +6,18 @@ module.exports = {
 		var data = await bot.utils.getExportData(bot, msg.guild.id);
 
 		var ch = await bot.getDMChannel(msg.author.id);
-		if(!ch) return msg.channel.createMessage("Can't get your DM channel :(");
+		if(!ch) return "Can't get your DM channel :(";
 		else {
 			try {
 				ch.createMessage("Here you go!",[{file: Buffer.from(JSON.stringify(data)), name: "hub_data.json"}]);
 			} catch(e) {
-				console.log(e.stack);
-				msg.channel.createMessage("DM failed!")
+				console.log(e);
+				return "ERR: "+e.message;
 			}
 		}
 
 		await msg.removeReaction("⌛");
+		return;
 	},
 	permissions: ["manageGuild"],
 	guildOnly: true

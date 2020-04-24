@@ -15,16 +15,36 @@ class StarboardStore extends Collection {
 					server_id,
 					channel_id,
 					emoji,
-					overide,
+					override,
 					tolerance
 				) VALUES ($1,$2,$3,$4,$5)`,
-				[server, channel, emoji, data.oveide || false, data.tolerance]);
+				[server, channel, emoji, data.override || false, data.tolerance]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
 			}
 			
 			res(await this.get(server, channel));
+		})
+	}
+
+	async index(server, channel, emoji, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO starboards (
+					server_id,
+					channel_id,
+					emoji,
+					override,
+					tolerance
+				) VALUES ($1,$2,$3,$4,$5)`,
+				[server, channel, emoji, data.override || false, data.tolerance]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
 		})
 	}
 

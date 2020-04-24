@@ -17,12 +17,30 @@ class FeedbackConfigStore extends Collection {
 					anon
 				) VALUES ($1,$2,$3)`,
 				[server, data.channel_id || "", data.anon || false]);
-			} catch() {
+			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
 			}
 
 			res(await this.get(server));
+		})
+	}
+
+	async index(server, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO feedback_configs (
+					server_id,
+					channel_id,
+					anon
+				) VALUES ($1,$2,$3)`,
+				[server, data.channel_id || "", data.anon || false]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+
+			res();
 		})
 	}
 

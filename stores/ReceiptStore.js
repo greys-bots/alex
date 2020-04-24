@@ -10,20 +10,39 @@ class ReceiptStore extends Collection {
 
 	async create(server, hid, data = {}) {
 		return new Promise(async (res, rej) => {
-			this.db.query(`INSERT INTO receipts (
-				hid,
-				server_id,
-				message,
-				link
-			) VALUES ($1,$2,$3,$4)`,
-			[hid, server, data.message || "", data.link || ""], async (err, rows) => {
-			 	if(err) {
-			 		console.log(err);
-			 		rej(err.message);
-			 	} else {
-			 		res(await this.get(server, hid));
-			 	}
-			 })
+			try {
+				await this.db.query(`INSERT INTO receipts (
+					hid,
+					server_id,
+					message,
+					link
+				) VALUES ($1,$2,$3,$4)`,
+				[hid, server, data.message, data.link])
+			} catch(e) {
+				console.log(e);
+		 		rej(e.message);
+			}
+			
+			res(await this.get(server, hid));
+		})
+	}
+
+	async index(server, hid, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO receipts (
+					hid,
+					server_id,
+					message,
+					link
+				) VALUES ($1,$2,$3,$4)`,
+				[hid, server, data.message, data.link])
+			} catch(e) {
+				console.log(e);
+		 		rej(e.message);
+			}
+			
+			res();
 		})
 	}
 
@@ -57,6 +76,26 @@ class ReceiptStore extends Collection {
 	async getAll(server) {
 		return new Promise((res, rej) => {
 			this.db.query(`SELECT * FROM receipts WHERE server_id = $1`,[server], {
+				id: Number,
+				hid: String,
+				server_id: String,
+				message: String,
+				link: String
+			}, (err, rows) => {
+				if(err) {
+					console.log(err);
+					rej(err.message);
+				} else {
+					if(rows[0]) res(rows);
+					else res(undefined);
+				}
+			})
+		})
+	}
+
+	async getLinked(server, hid) {
+		return new Promise((res, rej) => {
+			this.db.query(`SELECT * FROM receipts WHERE server_id = $1 AND link = $2`,[server, link], {
 				id: Number,
 				hid: String,
 				server_id: String,

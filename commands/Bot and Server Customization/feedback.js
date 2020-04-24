@@ -11,43 +11,37 @@ module.exports = {
 				 ' find [query] - Search through tickets to find ones matching the given query'],
 	desc: ()=> "A server's ID can be found by turning on developer mode and right clicking on a server (desktop) or opening a server's menu (mobile)",
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a server ID.")
-		var cfg = await bot.utils.getConfig(bot, args[0]);
-		var embed, anon;
-		if(!cfg || !cfg.feedback || !cfg.feedback.channel) return msg.channel.createMessage("That server is not currently accepting feedback");
+		if(!args[0]) return "Please provide a server ID.";
+		var cfg = await bot.stores.feedbackConfigs.get(args[0]);
+		if(!cfg || !cfg.channel_id) return "That server is not currently accepting feedback";
+
+		var embed, anon = false;
 		await msg.channel.createMessage("Please enter your message below. You have 5 minutes to do this.");
+		console.log(msg.channel);
 		var messages = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60*5,maxMatches:1});
 		if(messages[0]) embed = {title: "Feedback", description: messages[0].content};
-		else return msg.channel.createMessage("Action cancelled: timed out");
-		if(cfg.feedback.anon) {
-			console.log(cfg.feedback.anon);
+		else return "Action cancelled: timed out";
+		if(cfg.anon) {
 			await msg.channel.createMessage("Would you like this to be anonymous? (y/n)\nYou have 30 seconds to answer, otherwise it will not be anonymous");
 			messages = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:30000,maxMatches:1});
-			if(messages[0]) {
-				anon = ["y","yes","true","1"].includes(messages[0].content.toLowerCase());
-				embed.author = (anon ? {name: "Anonymous"} : {name: `${msg.author.username}#${msg.author.discriminator}`});
-			}
-			else {
-				anon = false;
-				embed.author = {name: `${msg.author.username}#${msg.author.discriminator}`}
-			}
-		} else {
-			anon = false;
-			embed.author = {name: `${msg.author.username}#${msg.author.discriminator}`}
+			if(messages[0] && ["y","yes","true","1"].includes(messages[0].content.toLowerCase())) anon = true;
 		}
+		if(!anon) embed.author = {name: `${msg.author.username}#${msg.author.discriminator}`, icon_url: msg.author.avatarURL};
+		else embed.author = {name: "Anonymous", icon_url: "https://discordapp.com/assets/6debd47ed13483642cf09e832ed0bc1b.png"};
+
 		var code = bot.utils.genCode(bot.chars);
 		embed.timestamp = new Date();
 		embed.footer = {text: `ID: ${code}`};
-		await msg.channel.createMessage({content: "Is this okay? (y/n)",embed: embed});
+		await msg.channel.createMessage({content: "Is this okay? (y/n)", embed: embed});
 
 		messages = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:30000,maxMatches:1});
 		if(messages[0]) {
 			if(["y","yes","true","1"].includes(messages[0].content.toLowerCase())) {
-				bot.createMessage(cfg.feedback.channel, {embed: embed});
-				bot.utils.addFeedbackTicket(bot, code, args[0], msg.author.id, embed.description, anon);
-				msg.channel.createMessage(`Sent!`)
-			} else return msg.channel.createMessage("Action cancelled");
-		} else return msg.channel.createMessage("Action cancelled: timed out");
+				bot.createMessage(cfg.channel_id, {embed: embed});
+				bot.stores.feedbackTickets.create(code, args[0], msg.author.id, embed.description, anon);
+				return `Sent!`;
+			} else return "Action cancelled";
+		} else return "Action cancelled: timed out";
 	},
 	subcommands: {},
 	alias: ['fb']
@@ -58,21 +52,26 @@ module.exports.subcommands.channel = {
 	usage: ()=> [" [channel] - Sets the channel",
 				 " - Resets the channel (disabled feedback"],
 	execute: async (bot, msg, args) => {
-		var cfg = (await bot.utils.getConfig(bot, msg.guild.id)) || {feedback: {anon: true}};
-		if(!cfg.feedback) cfg.feedback = {};
-		if(!args[0]) return msg.channel.createMessage("Please provide a channel.")
+		if(!args[0]) return "Please provide a channel";
+		var cfg = await bot.stores.feedbackConfigs.get(args[0]);
+		var feedback;
+		if(cfg) feedback = cfg;
+		else feedback = {};
+
 		var channel = msg.channelMentions.length > 0 ?
 				   msg.guild.channels.find(ch => ch.id == msg.channelMentions[0]) :
 				   msg.guild.channels.find(ch => ch.id == args[0] || ch.name == args[0]);
-		if(!channel && args[0]) return msg.channel.createMessage('Channel not found');
+		if(!channel) return 'Channel not found :(';
+		feedback.channel_id = channel.id;
 
-		if(channel) cfg.feedback.channel = channel.id;
-		else delete cfg.feedback.channel;
-		cfg.feedback.anon = cfg.feedback.anon != null ? cfg.feedback.anon : true;
-
-		var scc = await bot.utils.updateConfig(bot, msg.guild.id, {feedback: cfg.feedback});
-		if(scc) msg.channel.createMessage("Channel updated!");
-		else msg.channel.createMessage("Something went wrong");
+		try {
+			if(cfg) scc = await bot.stores.feedbackConfigs.update(msg.guild.id, feedback);
+			else scc = await bot.stores.feedbackConfigs.create(msg.guild.id, feedback);
+		} catch(e) {
+			return e;
+		}
+		
+		return "Channel updated!";
 	},
 	guildOnly: true,
 	permissions: ['manageGuild'],
@@ -81,17 +80,43 @@ module.exports.subcommands.channel = {
 
 module.exports.subcommands.anon = {
 	help: ()=> "Sets whether anon feedback is allowed or not",
-	usage: ()=> [" [1|0] - Sets the anon value"],
+	usage: ()=> [" [on | off] - Sets the anon value"],
+	desc: ()=> "Other available values:\nON: 1, enable, true\nOFF: 0, disable, false",
 	execute: async (bot, msg, args) => {
-		var cfg = (await bot.utils.getConfig(bot, msg.guild.id)) || {feedback: {anon: true}};
-		if(!cfg.feedback) cfg.feedback = {};
-		if(!args[0]) return msg.channel.createMessage("Please provide a value.")
+		if(!args[0]) return "Please provide a value";
+		var cfg = await bot.stores.feedbackConfigs.get(msg.guild.id);
+		console.log(cfg);
+		var feedback;
+		if(cfg) feedback = cfg;
+		else feedback = {};
+		delete feedback.id;
+		
+		switch(args[0].toLowerCase()) {
+			case "1":
+			case "on":
+			case "true":
+			case "enable":
+				feedback.anon = true;
+				break;
+			case "0":
+			case "off":
+			case "false":
+			case "disable":
+				feedback.anon = false;
+				break;
+			default:
+				return "That value is invalid :(";
+				break;
+		}
 
-		cfg.feedback.anon = args[0] == 1 ? true : false;
-
-		var scc = await bot.utils.updateConfig(bot, msg.guild.id, {feedback: cfg.feedback});
-		if(scc) msg.channel.createMessage("Anon setting updated!");
-		else msg.channel.createMessage("Something went wrong");
+		try {
+			if(cfg) scc = await bot.stores.feedbackConfigs.update(msg.guild.id, feedback);
+			else scc = await bot.stores.feedbackConfigs.create(msg.guild.id, feedback);
+		} catch(e) {
+			return e;
+		}
+		
+		return "Anon updated!";
 	},
 	guildOnly: true,
 	permissions: ['manageGuild']
@@ -101,16 +126,16 @@ module.exports.subcommands.config = {
 	help: ()=> "Views current config",
 	usage: ()=> [" - Views server's feedback config"],
 	execute: async (bot, msg, args) => {
-		var cfg = (await bot.utils.getConfig(bot, msg.guild.id)) || {feedback: {}};
-		if(!cfg.feedback) cfg.feedback = {};
-		var channel = cfg.feedback.channel ? msg.guild.channels.find(c => c.id == cfg.feedback.channel) : undefined;
-		msg.channel.createMessage({embed: {
+		var cfg = await bot.stores.feedbackConfigs.get(msg.guild.id)
+		if(!cfg) return "No config registered for this server";
+		var channel = cfg.channel_id ? msg.guild.channels.find(c => c.id == cfg.channel_id) : undefined;
+		return {embed: {
 			title: "Feedback Config",
 			fields: [
 			{name: "Channel", value: channel ? channel.mention : "*(not set)*"},
-			{name: "Anon", value: cfg.feedback.anon ? "True" : "False"}
+			{name: "Anon", value: cfg.anon ? "True" : "False"}
 			]
-		}})
+		}};
 	},
 	guildOnly: true
 }
@@ -119,13 +144,13 @@ module.exports.subcommands.reply = {
 	help: ()=> "Reply to a ticket",
 	usage: ()=> [" [hid] [message] - Send a message to a ticket's creator"],
 	execute: async (bot, msg, args) => {
-		if(!args[1]) return msg.channel.createMessage("Please provide a ticket and a message");
+		if(!args[1]) return "Please provide a ticket and a message";
 
-		var ticket = await bot.utils.getFeedbackTicket(bot, msg.guild.id, args[0]);
-		if(!ticket) return msg.channel.createMessage('Ticket not found');
+		var ticket = await bot.stores.feedbackTickets.get(msg.guild.id, args[0]);
+		if(!ticket) return 'Ticket not found';
 
 		var channel = await bot.getDMChannel(ticket.sender_id);
-		if(!channel) return msg.channel.createMessage("Can't deliver message: unable to get user's DM channel");
+		if(!channel) return "Can't deliver message: unable to get user's DM channel";
 
 		try {
 			channel.createMessage({embed: {
@@ -138,10 +163,10 @@ module.exports.subcommands.reply = {
 			}})
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage('Reply failed: '+e.message);
+			return 'Reply failed: '+e.message;
 		}
 
-		msg.channel.createMessage('Reply sent!');
+		return 'Reply sent!';
 	},
 	guildOnly: true,
 	permissions: ['manageGuild']
@@ -152,15 +177,15 @@ module.exports.subcommands.delete = {
 	usage: ()=> [" [hid] - Deletes the given ticket",
 				 " * - Deletes all registered tickets"],
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage('Please provide a ticket to delete');
+		if(!args[0]) return 'Please provide a ticket to delete';
 		if(args[0] == "*") {
-			var scc = await bot.utils.deleteFeedbackTickets(bot, msg.guild.id);
-			if(scc) msg.channel.createMessage('Tickets deleted!');
-			else msg.channel.createMessage('Something went wrong')
+			var scc = await bot.stores.feedbackTickets.deleteAll(msg.guild.id);
+			if(scc) return 'Tickets deleted!';
+			else return 'Something went wrong';
 		} else {
-			var scc = await bot.utils.deleteFeedbackTicket(bot, msg.guild.id, args[0]);
-			if(scc) msg.channel.createMessage('Ticket deleted!');
-			else msg.channel.createMessage('Something went wrong')
+			var scc = await  bot.stores.feedbackTickets.delete(msg.guild.id, args[0]);
+			if(scc) return 'Ticket deleted!';
+			else return 'Something went wrong';
 		}
 	},
 	guildOnly: true,
@@ -171,51 +196,32 @@ module.exports.subcommands.list = {
 	help: ()=> "Lists all feedback tickets",
 	usage: ()=> [" - Lists all indexed tickets for the server"],
 	execute: async (bot, msg, args) => {
-		var tickets = await bot.utils.getFeedbackTickets(bot, msg.guild.id);
-		if(!tickets || !tickets[0]) return msg.channel.createMessage('No tickets registered for this server');
+		var tickets = await bot.stores.feedbackTickets.getAll(msg.guild.id);
+		if(!tickets || !tickets[0]) return 'No tickets registered for this server';
 
-		await Promise.all(tickets.map(async t => {
-			var user = await bot.utils.fetchUser(bot, t.sender_id);
-			if(user && !t.anon) t.user = `${user.username}#${user.discriminator}`;
-			else if(t.anon) t.user = "Anonymous";
-			else t.user = "*(User not cached)*"
-		}));
-
-		if(tickets.length > 10) {
-			var embeds = await bot.utils.genEmbeds(bot, tickets, async dat => {
-				return {name: `User: ${dat.user} | Ticket: ${dat.hid}`, value: dat.message.length > 500 ? dat.message.slice(0, 500) + "..." : dat.message}
-			}, {
-				title: "Feedback",
-				description: "Use `hh!feedback view [id]` to view a ticket individually",
-			}, 10);
-
-			var message = await msg.channel.createMessage(embeds[0])
-			if(!bot.menus) bot.menus = {};
-			bot.menus[message.id] = {
-				user: msg.author.id,
-				index: 0,
-				data: embeds,
-				timeout: setTimeout(()=> {
-					if(!bot.menus[message.id]) return;
-					try {
-						message.removeReactions();
-					} catch(e) {
-						console.log(e);
-					}
-					delete bot.menus[message.id];
-				}, 900000),
-				execute: bot.utils.paginateEmbeds
-			};
-			["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
-		} else {
-			msg.channel.createMessage({embed: {
-				title: "Feedback",
-				description: "Use `hh!feedback view [id]` to view a ticket individually",
-				fields: tickets.map(t => {
-					return {name: `User: ${t.user} | Ticket: ${t.hid}`, value: t.message.length > 500 ? t.message.slice(0, 500) + "..." : t.message}
-				})
-			}})
+		for(var ticket of tickets) {
+			try {
+				var user = await bot.utils.fetchUser(bot, ticket.sender_id);
+			} catch(e) {
+				return `ERR on ticket ${ticket.hid}: ${e}`;
+			}
+			if(user && !ticket.anon) ticket.user = {name: `${user.username}#${user.discriminator}`, icon_url: user.avatarURL};
+			else if(ticket.anon) ticket.user = {name: "Anonymous", icon_url: "https://discordapp.com/assets/6debd47ed13483642cf09e832ed0bc1b.png"};
+			else ticket.user = {name: "*(User not cached)*", icon_url: null};
 		}
+
+		var embeds = tickets.map((t,i) => {
+			return {embed: {
+				title: `Ticket ${t.hid} (${i+1}/${tickets.length})`,
+				description: t.message,
+				author: t.user,
+				footer: {
+					text: `ID: ${t.hid}`
+				}
+			}}
+		})
+
+		return embeds;
 	},
 	guildOnly: true,
 	permissions: ['manageGuild']
@@ -225,19 +231,24 @@ module.exports.subcommands.view = {
 	help: ()=> "Views an individual ticket",
 	usage: ()=> [" [id] - Views a ticket with the given ID"],
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a ticket ID.")
-		var ticket = await bot.utils.getFeedbackTicket(bot, msg.guild.id, args[0]);
-		if(!ticket) return msg.channel.createMessage("That ticket does not exist");
+		if(!args[0]) return "Please provide a ticket ID.";
+		var ticket = await bot.stores.feedbackTickets.get( msg.guild.id, args[0]);
+		if(!ticket) return "That ticket does not exist";
 
 		var user = await bot.utils.fetchUser(bot, ticket.sender_id);
+
+		if(user && !ticket.anon) ticket.user = {name: `${user.username}#${user.discriminator}`, icon_url: user.avatarURL};
+		else if(ticket.anon) ticket.user = {name: "Anonymous", icon_url: "https://discordapp.com/assets/6debd47ed13483642cf09e832ed0bc1b.png"};
+		else ticket.user = {name: "*(User not cached)*", icon_url: null};
 		
-		msg.channel.createMessage({embed: {
+		return {embed: {
 			title: "Feedback",
 			description: ticket.message,
-			author: {
-				name: ticket.anon ? "Anonymous" : `${user.username}#${user.discriminator}`
+			author: ticket.user,
+			footer: {
+				text: `ID: ${t.hid}`
 			}
-		}})
+		}};
 	},
 	guildOnly: true,
 	permissions: ['manageGuild']
@@ -249,67 +260,44 @@ module.exports.subcommands.find = {
 				 " from:[userID] - Find tickets from a certain user (does not list anonymous ones)",
 				 " from:[userID] [words to search] - Find tickets from a certain user that also contain certain words (also does not list anonymous ones)"],
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a search query.")
-		var query;
-		var user;
+		if(!args[0]) return "Please provide a search query.";
+		var query = {};
 		var tickets;
 		if(args[0].toLowerCase().startsWith('from:')) {
-			user = args[0].toLowerCase().replace('from:','');
-			query = args[1] ? args.slice(1).join(" ").toLowerCase() : undefined;
+			query.user = args[0].toLowerCase().replace('from:','');
+			query.message = args[1] ? args.slice(1).join(" ").toLowerCase() : undefined;
 		} else {
-			query = args[0] ? args.join(" ").toLowerCase() : undefined;
+			query.message = args[0] ? args.join(" ").toLowerCase() : undefined;
 		}
-		if(!user && !query) return msg.channel.createMessage("Please provide a search query");
+		if(!query.user && !query.message) return "Please provide a search query";
 
-		if(user && !query) tickets = await bot.utils.getFeedbackTicketsFromUser(bot, msg.guild.id, user);
-		if(user && query) tickets = await bot.utils.searchFeedbackTicketsFromUser(bot, msg.guild.id, user, query);
-		if(!user && query) tickets = await bot.utils.searchFeedbackTickets(bot, msg.guild.id, query);
+		var tickets = await bot.stores.feedbackTickets.search(msg.guild.id, query)
 
-		if(!tickets || !tickets[0]) return msg.channel.createMessage('No tickets found matching that query');
+		if(!tickets || !tickets[0]) return 'No tickets found matching that query';
 
-		await Promise.all(tickets.map(async t => {
-			var user = await bot.utils.fetchUser(bot, t.sender_id);
-			console.log(t.anon);
-			if(user && !t.anon) t.user = `${user.username}#${user.discriminator}`;
-			else if(t.anon) t.user = "Anonymous";
-			else t.user = "*(User not cached)*"
-		}));
-
-		if(tickets.length > 10) {
-			var embeds = await bot.utils.genEmbeds(bot, tickets, async dat => {
-				return {name: `User: ${dat.user} | Ticket: ${dat.hid}`, value: dat.message.length > 500 ? dat.message.slice(0, 500) + "..." : dat.message}
-			}, {
-				title: "Search Results",
-				description: "Use `hh!feedback view [id]` to view a ticket individually",
-			}, 10);
-
-			var message = await msg.channel.createMessage(embeds[0])
-			if(!bot.menus) bot.menus = {};
-			bot.menus[message.id] = {
-				user: msg.author.id,
-				index: 0,
-				data: embeds,
-				timeout: setTimeout(()=> {
-					if(!bot.menus[message.id]) return;
-					try {
-						message.removeReactions();
-					} catch(e) {
-						console.log(e);
-					}
-					delete bot.menus[message.id];
-				}, 900000),
-				execute: bot.utils.paginateEmbeds
-			};
-			["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
-		} else {
-			msg.channel.createMessage({embed: {
-				title: "Search Results",
-				description: "Use `hh!feedback view [id]` to view a ticket individually",
-				fields: tickets.map(t => {
-					return {name: `User: ${t.user} | Ticket: ${t.hid}`, value: t.message.length > 500 ? t.message.slice(0, 500) + "..." : t.message}
-				})
-			}})
+		for(var ticket of tickets) {
+			try {
+				var user = await bot.utils.fetchUser(bot, ticket.sender_id);
+			} catch(e) {
+				return `ERR on ticket ${ticket.hid}: ${e}`;
+			}
+			if(user && !ticket.anon) ticket.user = `${user.username}#${user.discriminator}`;
+			else if(ticket.anon) ticket.user = "Anonymous";
+			else ticket.user = "*(User not cached)*";
 		}
+
+		var embeds = tickets.map((t,i) => {
+			return {embed: {
+				title: `Ticket ${ticket.hid} (${i+1}/${tickets.length})`,
+				description: t.message,
+				author: {
+					username: ticket.user
+				},
+				footer: {
+					text: `ID: ${t.hid}`
+				}
+			}}
+		})
 	},
 	alias: ['search'],
 	guildOnly: true,

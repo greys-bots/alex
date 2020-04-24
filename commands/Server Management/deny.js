@@ -2,7 +2,8 @@ module.exports = {
 	help: ()=> "Denies a server listing",
 	usage: ()=> [" [name] (new line) [reason] - Denies the server with the given reason (NOTE: reason must be on a new line)"],
 	execute: async (bot, msg, args)=> {
-		var conf = await bot.utils.getConfig(bot, msg.guild.id);
+		if(!args[0]) return "Please provide a server to deny";
+		var conf = await bot.stores.configs.get(msg.guild.id);
 		var channel;
 		var name = args.join(" ").split("\n")[0];
 		var reason = args.join(" ").split("\n").slice(1).join("\n") || "(no reason given)";
@@ -32,14 +33,20 @@ module.exports = {
 					text: code
 				}
 			}})
+			await bot.stores.listingLogs.create(msg.guild.id, code, {
+				channel_id: message.channel.id,
+				message_id: message.id,
+				server_name: name,
+				reason,
+				date,
+				type: 1
+			});
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Something went wrong");
+			return "ERR: "+(e.message || e);
 		}
 		
-		var scc = await bot.utils.addListingLog(bot, code, msg.guild.id, message.channel.id, message.id, name, reason, date, 1);
-		if(scc) msg.channel.createMessage("Server denied! Log ID: "+code);
-		else msg.channel.createMessage("Something went wrong while adding the listing log");
+		return "Server denied! Log ID: "+code;
 	},
 	permissions: ["manageMessages"],
 	subcommands: {},
@@ -51,24 +58,20 @@ module.exports.subcommands.edit = {
 	usage: ()=> [" [logID] [new message] - Edits the message on a denial log"],
 	desc: ()=> "You can also use `hub!delist edit [id] [reason]` to edit denial logs",
 	execute: async (bot, msg, args) => {
-		if(!args[1]) return msg.channel.createMessage("Please provide a log ID and a reason");
-		var log = await bot.utils.getListingLog(bot, args[0].toLowerCase(), msg.guild.id);
+		if(!args[1]) return "Please provide a log ID and a reason";
+		var log = await bot.stores.listingLogs.get(msg.guild.id, args[0].toLowerCase());
 		var reason = args.slice(1).join(" ");
 
-		if(!log) return msg.channel.createMessage("Log not found");
-		else if(log == "deleted") return msg.channel.createMessage("Log was deleted due to the message no longer existing");
+		if(!log || log == "deleted") return "Log not found";
 
 		try {
-			log.embed.fields[1].value = reason;
-			bot.editMessage(log.channel_id, log.message_id, {embed: log.embed});
+			await bot.stores.listingLogs.update(msg.guild.id, log.hid, {reason})
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Something went wrong")
+			return "ERR: "+e;
 		}
 		
-		var scc = await bot.utils.updateListingLog(bot, log.hid, msg.guild.id, {reason: reason})
-		if(scc) msg.channel.createMessage("Log edited!");
-		else msg.channel.createMessage("Something went wrong");
+		return "Log edited!";
 	},
 	guildOnly: true,
 	permissions: ["manageMessages"]

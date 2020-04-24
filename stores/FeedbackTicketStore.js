@@ -8,7 +8,7 @@ class FeedbackTicketStore extends Collection {
 		this.bot = bot;
 	};
 
-	async create(hid, server, channel, message, anon) {
+	async create(hid, server, sender, message, anon) {
 		return new Promise(async (res, rej) => {
 			try {
 				await this.db.query(`INSERT INTO feedback (
@@ -18,13 +18,33 @@ class FeedbackTicketStore extends Collection {
 					message,
 					anon
 				) VALUES ($1,$2,$3,$4,$5)`,
-				[hid, server, channel, message, anon || false]);
+				[hid, server, sender, message, anon || false]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
 			}
 			
-			res(await this.get(host, message));
+			res(await this.get(server, hid));
+		})
+	}
+
+	async index(hid, server, sender, message, anon) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO feedback (
+					hid,
+					server_id,
+					sender_id,
+					message,
+					anon
+				) VALUES ($1,$2,$3,$4,$5)`,
+				[hid, server, sender, message, anon || false]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
 		})
 	}
 

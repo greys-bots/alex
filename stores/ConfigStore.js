@@ -32,6 +32,30 @@ class ConfigStore extends Collection {
 		})
 	}
 
+	async index(server, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO configs (
+					server_id,
+					banlog_channel,
+					ban_message,
+					reprole,
+					delist_channel,
+					starboard,
+					blacklist
+				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				[server, data.banlog_channel || "", data.ban_message || "",
+				 data.reprole || "", data.delist_channel || "",
+				 data.starboard, data.blacklist || []])
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
+		})
+	}
+
 	async get(server, forceUpdate = false) {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {

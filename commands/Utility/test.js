@@ -1,8 +1,8 @@
 module.exports = {
 	help: ()=> "Test command",
 	usage: ()=> [" - Test that the bot is up"],
-	execute: (bot, msg, args) =>{
-		msg.channel.createMessage("Beep boop")
+	execute: async (bot, msg, args) =>{
+		return "Beep boop!";
 	},
 	alias: ["t"]
 }

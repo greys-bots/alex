@@ -9,9 +9,9 @@ class SyncMenuStore extends Collection {
 	};
 
 	async create(server, channel, message, data = {}) {
-		return new Promise(res => {
+		return new Promise(async (res, rej) => {
 			try {
-				await bot.db.query(`INSERT INTO sync_menus (
+				await this.db.query(`INSERT INTO sync_menus (
 					server_id,
 					channel_id,
 					message_id,
@@ -26,6 +26,27 @@ class SyncMenuStore extends Collection {
 			}
 
 			res(await this.get(`${server}-${channel}-${message}`));
+		})
+	}
+
+	async index(server, channel, message, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO sync_menus (
+					server_id,
+					channel_id,
+					message_id,
+					type,
+					reply_guild,
+					reply_channel
+				) VALUES ($1,$2,$3,$4,$5,$6)`,
+				[server, channel, message, data.type, data.reply_server, data.reply_channel]);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message);
+			}
+
+			res();
 		})
 	}
 

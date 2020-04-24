@@ -15,7 +15,7 @@ class TicketConfigStore extends Collection {
 					server_id,
 					category_id,
 					archives_id
-				) VALUES ($1,$2,$3,$4,$5,$6)`,
+				) VALUES ($1,$2,$3)`,
 				[server, data.category_id, data.archives_id]);
 			} catch(e) {
 				console.log(e);
@@ -23,6 +23,24 @@ class TicketConfigStore extends Collection {
 			}
 			
 			res(await this.get(server));
+		})
+	}
+
+	async index(server, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO ticket_configs (
+					server_id,
+					category_id,
+					archives_id
+				) VALUES ($1,$2,$3)`,
+				[server, data.category_id, data.archives_id]);
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+			
+			res();
 		})
 	}
 

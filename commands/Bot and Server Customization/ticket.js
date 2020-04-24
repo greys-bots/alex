@@ -12,58 +12,24 @@ module.exports = {
 				 " config - Configure the ticket system"],
 	desc: ()=> "Before using this, you should run `hub!ticket config`. Use `hub!ticket post [channel]` or `hub!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
 	execute: async (bot, msg, args) => {
-		var tickets = await bot.utils.getSupportTickets(bot, msg.guild.id);
-		if(!tickets) return msg.channel.createMessage("No support tickets registered for this server");
+		var tickets = await bot.stores.tickets.getAll(msg.guild.id);
+		if(!tickets || !tickets[0]) return "No support tickets registered for this server";
 
-		if(tickets.length > 10) {
-			var embeds = await bot.utils.genEmbeds(bot, tickets, async dat => {
-				return {
-					name: `Ticket ${dat.hid}`,
-					value: [
-						`[first message](https://discordapp.com/channels/${msg.guild.id}/${dat.channel_id}/${dat.first_message})`,
-						`Opener: ${dat.opener.username}#${dat.opener.discriminator} (${dat.opener.id})`
-						`Users:\n${dat.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")}`
-					].join("\n\n")
-				}
-			}, {
-				title: "Server Suport Tickets",
-				description: `Total tickets: ${tickets.length}`
-			});
-			
-			var message = await msg.channel.createMessage(embeds[0])
-			if(!bot.menus) bot.menus = {};
-			bot.menus[message.id] = {
-				user: msg.author.id,
-				index: 0,
-				data: embeds,
-				timeout: setTimeout(()=> {
-					if(!bot.menus[message.id]) return;
-					try {
-						message.removeReactions();
-					} catch(e) {
-						console.log(e);
-					}
-					delete bot.menus[message.id];
-				}, 900000),
-				execute: bot.utils.paginateEmbeds
-			};
-			["\u2b05", "\u27a1", "\u23f9"].forEach(r => message.addReaction(r));
-		} else {
-			msg.channel.createMessage({embed: {
-				title: "Server Support Tickets",
-				description: `Total tickets: ${tickets.length}`,
-				fields: tickets.map(t => {
-					return {
-						name: `Ticket ${t.hid}`,
-						value: [
-							`[first message](https://discordapp.com/channels/${msg.guild.id}/${t.channel_id}/${t.first_message})`,
-							`Opener: ${t.opener.username}#${t.opener.discriminator} (${t.opener.id})`,
-							`Users:\n${t.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")}`
-						].join("\n")
-					}
-				})
-			}})
-		}
+		var embeds = await bot.utils.genEmbeds(bot, tickets, async dat => {
+			return {
+				name: `Ticket ${dat.hid}`,
+				value: [
+					`[first message](https://discordapp.com/channels/${msg.guild.id}/${dat.channel_id}/${dat.first_message})`,
+					`Opener: ${dat.opener.username}#${dat.opener.discriminator} (${dat.opener.id})`
+					`Users:\n${dat.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")}`
+				].join("\n\n")
+			}
+		}, {
+			title: "Server Suport Tickets",
+			description: `Total tickets: ${tickets.length}`
+		});
+
+		return embeds;
 	},
 	permissions: ["manageMessages"],
 	guildOnly: true,
@@ -76,15 +42,15 @@ module.exports.subcommands.post = {
 	usage: ()=> [" [channel] - Post the starter message"],
 	desc: ()=> "The channel can be a #mention, channel ID, or channel-name",
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a channel to post to");
+		if(!args[0]) return "Please provide a channel to post to";
 
-		var cfg = await bot.utils.getSupportConfig(bot, msg.guild.id);
-		if(!cfg) return msg.channel.createMessage("Please run `hub!ticket config` before doing this");
+		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
+		if(!cfg) return "Please run `ha!ticket config` before doing this";
 
 		var channel = msg.channelMentions.length > 0 ?
 				   msg.guild.channels.find(ch => ch.id == msg.channelMentions[0]) :
 				   msg.guild.channels.find(ch => ch.id == args[0] || ch.name == args[0].toLowerCase());
-		if(!channel) return msg.channel.createMessage("Channel not found");
+		if(!channel) return "Channel not found";
 
 		try {
 			var message = await channel.createMessage({embed: {
@@ -94,19 +60,23 @@ module.exports.subcommands.post = {
 			}});
 		} catch(e) {
 			console.log(e.stack);
-			return msg.channel.createMessage("ERR: \n"+e.message);
+			return "ERR: \n"+e.message;
 		}
 
 		try {
 			message.addReaction("✅")
 		} catch(e) {
 			console.log(e.stack);
-			return msg.channel.createMessage("ERR: \n"+e.message);
+			return "ERR: \n"+e.message;
 		}
 
-		var scc = await bot.utils.addTicketPost(bot, msg.guild.id, message.channel.id, message.id);
-		if(scc) msg.channel.createMessage("Post sent!");
-		else msg.channel.createMessage("Something went wrong")
+		try {
+			await bot.stores.ticketPosts.create(msg.guild.id, message.channel.id, message.id);
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "Post sent!";
 	},
 	permissions: ["manageMessages"],
 	guildOnly: true
@@ -117,43 +87,42 @@ module.exports.subcommands.config = {
 	usage: ()=> [" - Show the current config",
 				 " setup - Run the config menu"],
 	execute: async (bot, msg, args) => {
-		var cfg = await bot.utils.getSupportConfig(bot, msg.guild.id);
+		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
 		if(!cfg) cfg = {category_id: "", archives_id: ""};
 
 		var category = cfg.category_id != "" ? msg.guild.channels.find(c => c.id == cfg.category_id) : undefined;
 		var archives = cfg.archives_id != "" ? msg.guild.channels.find(c => c.id == cfg.archives_id) : undefined;
 
-		if(!args[0] || args[0] != "setup") return msg.channel.createMessage({embed: {
+		if(!args[0] || args[0] != "setup") return {embed: {
 			title: "Ticket Config",
 			fields: [
 				{name: "Category ID", value: (category ? category.name.toLowerCase() : "*(not set)*")},
 				{name: "Archive channel ID", value: (archives ? archives.name.toLowerCase() : "*(not set)*")}
 			]
-		}});
+		}};
 
 		var resp;
 		
 		await msg.channel.createMessage("Enter the category that tickets should be created in. This can be the category name or ID. You have 1 minute to do this\nNOTE: This category's permissions should only allow mods and I to see channels; I handle individual permissions for users!"+(category ? "\nType `skip` to keep the current value" : ""));
 		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
-		if(!resp[0]) return msg.channel.createMessage("Action cancelled: timed out");
+		if(!resp[0]) return "Action cancelled: timed out";
 		if(!(category && resp[0].content.toLowerCase() == "skip")) category = await msg.guild.channels.find(c => (c.id == resp[0].content || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 4);
-		if(!category) return msg.channel.createMessage("Action cancelled: category not found");
+		if(!category) return "Action cancelled: category not found";
 
 		await msg.channel.createMessage("Enter the channel that archived tickets should be sent to. This can be the channel name, #mention, or ID. You have 1 minute to do this\nNOTE: This is not required. Type `skip` to skip it, and archives will be sent to your DMs instead");;
 		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
-		if(!resp[0]) return msg.channel.createMessage("Action cancelled: timed out");
+		if(!resp[0]) return "Action cancelled: timed out";
 		if(resp[0].content.toLowerCase() != "skip") archives = await msg.guild.channels.find(c => (c.id == resp[0].content.replace(/<#>/g,"") || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 0);
-		if(!archives && resp[0].toLowerCase() != "skip") return msg.channel.createMessage("Action cancelled: category not found");
+		if(!archives && resp[0].toLowerCase() != "skip") return "Action cancelled: category not found";
 
-		var scc;
-		if(cfg.category_id == "") {
-			scc = await bot.utils.createSupportConfig(bot, msg.guild.id, category.id, archives.id);
-		} else {
-			scc = await bot.utils.updateSupportConfig(bot, msg.guild.id, ["category_id", category.id, "archives_id", archives.id]);
+		try {
+			if(cfg.category_id == "") await bot.stores.ticketConfigs.create(msg.guild.id, {category_id: category.id, archives_id: archives.id});
+			else await bot.stores.ticketConfigs.update(msg.guild.id, {category_id: category.id, archives_id: archives.id});
+		} catch(e) {
+			return "ERR: "+e;
 		}
 
-		if(scc) msg.channel.createMessage("Config set!");
-		else msg.channel.createMessage("Something went wrong");
+		return "Config set!";
 	},
 	permissions: ["manageGuild"],
 	guildOnly: true,
@@ -166,17 +135,17 @@ module.exports.subcommands.archive = {
 				 " [hid] - Sends the user a text transcript of the ticket with the given hid and deletes its channel"],
 	desc: ()=> "This command does NOT save images. Please save images yourself before using the command!",
 	execute: async (bot, msg, args) => {
-		var config = await bot.utils.getSupportConfig(bot, msg.guild.id);
+		var config = await bot.stores.ticketConfigs.get(msg.guild.id);
 		if(!config) config = {archives_id: null};
 		
-		var ticket = args[0] ? await bot.utils.getSupportTicket(bot, msg.guild.id, args[0].toLowerCase()) : await bot.utils.getSupportTicketByChannel(bot, msg.guild.id, msg.channel.id);
-		if(!ticket) return msg.channel.createMessage("Please provide a valid ticket hid or use this command in a ticket channel");
+		var ticket = args[0] ? await bot.stores.tickets.get(msg.guild.id, args[0].toLowerCase()) : await bot.stores.tickets.getByChannel(msg.guild.id, msg.channel.id);
+		if(!ticket) return "Please provide a valid ticket hid or use this command in a ticket channel";
 
 		var channel = msg.guild.channels.find(c => c.id == ticket.channel_id);
-		if(!channel) return msg.channel.createMessage("Couldn't find the channel associated with that ticket");
+		if(!channel) return "Couldn't find the channel associated with that ticket";
 
 		var messages = await channel.getMessages(10000, null, ticket.first_message);
-		if(!messages) return msg.channel.createMessage("Either that channel has no messages or I couldn't get them");
+		if(!messages) return "Either that channel has no messages or I couldn't get them";
 
 		var data = [];
 		messages.forEach(m => {
@@ -191,7 +160,7 @@ module.exports.subcommands.archive = {
 		var c;
 		if(config.archives_id) {
 			c = msg.guild.channels.find(ch => ch.id == config.archives_id);
-			if(!c) return msg.channel.createMessage("Couldn't find your archives channel; please reconfigure it");
+			if(!c) return "Couldn't find your archives channel; please reconfigure it";
 
 			var date = new Date();
 
@@ -207,16 +176,17 @@ module.exports.subcommands.archive = {
 				color: 5821280
 			}
 			try {
-				c.createMessage({embed: embed},{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
+				c.createMessage({embed},{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
 				`Ticket opener: ${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})\r\n`,
-				 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\r\n")}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
+				 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\r\n")}`,"\r\n------\r\n"].join("")+
+				 data.reverse().join("\r\n------\r\n")), name: channel.name+".txt"})
 			} catch(e) {
 				console.log(e);
-				return msg.channel.createMessage("Error while sending the archive:\n"+e.message+"\n\nAction aborted due to error");
+				return "Error while sending the archive:\n"+e.message+"\n\nAction aborted due to error";
 			}
 		} else {
 			c = await bot.getDMChannel(msg.author.id);
-			if(!c) return msg.channel.createMessage("Please make sure I can DM you");
+			if(!c) return "Please make sure I can DM you";
 
 			try {
 				c.createMessage("Here is the archive:",{file: Buffer.from([`Ticket opened: ${bot.formatTime(new Date(ticket.timestamp))}\r\n`,
@@ -224,22 +194,26 @@ module.exports.subcommands.archive = {
 				 `Users involved:\r\n${ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\r\n")}`,"\r\n------\r\n"].join("")+data.reverse().join("\r\n------\r\n")),name: channel.name+".txt"})
 			} catch(e) {
 				console.log(e);
-				return msg.channel.createMessage("Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error");
+				return "Error while DMing the archive:\n"+e.message+"\n\nAction aborted due to error";
 			}
 
 		}
 
 		try {
-			channel.delete("Ticket archived");
+			await channel.delete("Ticket archived");
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Error while deleting channel:\n"+e.message)
+			return "Error while deleting channel:\n"+e.message
 		}
 
-		var scc = await bot.utils.deleteSupportTicket(bot, msg.guild.id, channel.id);
-		if(!scc) {
-			channel.id == msg.channel.id ? c.createMessage("Ticket archived, but could not be deleted from the database") : msg.channel.createMessage("Ticket archived, but could not be deleted from the database")
+		try {
+			await bot.stores.tickets.delete(msg.guild.id, ticket.hid);
+		} catch(e) {
+			(channel.id == msg.channel.id ? c : msg.channel).createMessage("Ticket archived, but could not be deleted from the database");
+			return;
 		}
+
+		return;
 	},
 	permissions: ['manageMessages'],
 	guildOnly: true
@@ -250,28 +224,26 @@ module.exports.subcommands.delete = {
 	usage: ()=> [" - Deletes the current channel's ticket and associated channel",
 				 " [hid] - Deletes the given ticket and its associated channel"],
 	execute: async (bot, msg, args) => {
-		var ticket = args[0] ? await bot.utils.getSupportTicket(bot, msg.guild.id, args[0].toLowerCase()) : await bot.utils.getSupportTicketByChannel(bot, msg.guild.id, msg.channel.id);
-		if(!ticket) return msg.channel.createMessage("Please provide a valid ticket hid or use this command in a ticket channel");
+		var ticket = args[0] ? await bot.stores.tickets.get(msg.guild.id, args[0].toLowerCase()) : await bot.stores.tickets.getByChannel(msg.guild.id, msg.channel.id);
+		if(!ticket) return "Please provide a valid ticket hid or use this command in a ticket channel";
 
 		var channel = msg.guild.channels.find(c => c.id == ticket.channel_id);
-		if(!channel) return msg.channel.createMessage("Couldn't find the channel associated with that ticket");
+		if(!channel) return "Couldn't find the channel associated with that ticket";
+
+		var c = await bot.getDMChannel(msg.author.id);
+		if(!c) return "Please make sure I can DM you";
 
 		try {
 			channel.delete("Ticket deleted");
+			await bot.stores.tickets.delete(msg.guild.id, ticket.hid);
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("Error while deleting channel:\n"+e.message)
+			if(e.message) return "Error while deleting channel:\n"+e.message;
+			else (channel.id == msg.channel.id ? c : msg.channel).createMessage("ERR: "+e);
+			return;
 		}
 
-		var c = await bot.getDMChannel(msg.author.id);
-		if(!c) return msg.channel.createMessage("Please make sure I can DM you");
-
-		var scc = await bot.utils.deleteSupportTicket(bot, msg.guild.id, channel.id);
-		if(scc) {
-			channel.id == msg.channel.id ? c.createMessage("Ticket successfully deleted!") : msg.channel.createMessage("Ticket successfully deleted!")
-		} else {
-			channel.id == msg.channel.id ? c.createMessage("Channel deleted, but the ticket could not be deleted from the database") : msg.channel.createMessage("Channel deleted, but the ticket could not be deleted from the database")
-		}
+		return "Ticket successfully deleted!";
 	},
 	permissions: ['manageMessages'],
 	guildOnly: true
@@ -283,61 +255,37 @@ module.exports.subcommands.add = {
 				 " [hid] [user] [user] ... - Add users to a support ticket with the given hid"],
 	desc: ()=> "Users can be @mentions or user IDs. Up to 10 users can be added to a ticket via commands - others will need to be added manually. This does not include moderators or the original opener of the ticket.",
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide users to add to the ticket");
+		if(!args[0]) return "Please provide users to add to the ticket";
 
 		var ids;
-		var ticket = await bot.utils.getSupportTicket(bot, msg.guild.id, args[0].toLowerCase());
+		var ticket = await bot.stores.tickets.get(msg.guild.id, args[0].toLowerCase());
 		if(ticket) ids = args.slice(1).map(id => id.replace(/[<@!>]/g,""));
 		else {
-			ticket = await bot.utils.getSupportTicketByChannel(bot, msg.guild.id, msg.channel.id);
+			ticket = await bot.stores.tickets.getByChannel(msg.guild.id, msg.channel.id);
 			ids = args.map(id => id.replace(/[<@!>]/g,""))
 		}
-		if(!ticket) return msg.channel.createMessage("Please provide a valid ticket hid or use this command in a ticket channel");
-
-		if(ids.length > 10 || (ids.length + ticket.users.length-1) > 10) return msg.channel.createMessage("Only to 10 users can be added to tickets via the command.");
-		ids = ticket.users.map(u => u.id).concat(ids.filter(id => !ticket.users.includes(id)));
-
-		var members = msg.guild.members.filter(m => ids.includes(m.id));
-		if(!members || !members[0]) return msg.channel.createMessage("Please provide valid members to add to the ticket");
+		if(!ticket) return "Please provide a valid ticket hid or use this command in a ticket channel";
 
 		var channel = msg.guild.channels.find(c => c.id == ticket.channel_id);
-		if(!channel) return msg.channel.createMessage("ERR: Couldn't get the channel associated with that ticket");
+		if(!channel) return "Couldn't get the channel associated with that ticket";
+
+		if(ids.length > 10 || (ids.length + ticket.user_ids.length-1) > 10) return "Only to 10 users can be added to tickets via the command";
+		ids = ticket.user_ids.concat(ids.filter(id => !ticket.user_ids.includes(id)));
+
+		var members = msg.guild.members.filter(m => ids.includes(m.id)).map(m => m.id);
+		if(!members || !members[0]) return "Please provide valid members to add to the ticket";
 
 		try {
-			await Promise.all(members.map(m => {
-				return channel.editPermission(m.id, 1024, 0, "member");
-			}))
+			for(var m of members) {
+				await channel.editPermission(m, 1024, 0, "member");
+			}
+			await bot.stores.tickets.update(msg.guild.id, ticket.hid, {users: members});
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("ERR:\n"+e.message);
+			return "ERR: "+(e.message || e);
 		}
 
-		var message = await msg.channel.getMessage(ticket.first_message);
-		if(!message) msg.channel.createMessage("Couldn't get the ticket's first message; users have been added, but won't be shown there")
-		else {
-			try {
-				await message.edit({embed: {
-					title: "Ticket opened!",
-					fields: [
-						{name: "Ticket Opener", value: members[0].mention},
-						{name: "Ticket Users", value: members.map(m => m.mention).join("\n")}
-					],
-					color: 2074412,
-					footer: {
-						text: "Ticket ID: "+ticket.hid
-					},
-					timestamp: ticket.timestamp
-				}})
-			} catch(e) {
-				console.log(e);
-				msg.channel.createMessage("Couldn't edit ticket message; users have been added, but won't be reflected there");
-			}
-		}
-
-		var scc = await bot.utils.editSupportTicket(bot, msg.guild.id, ticket.hid, "users", members.map(m => m.id));
-		if(scc) msg.channel.createMessage("Users added to ticket!");
-		else msg.channel.createMessage("Users added to channel, but could not be saved to the ticket");
-
+		return "Users added to ticket!";
 	},
 	permissions: ['manageMessages'],
 	guildOnly: true
@@ -349,60 +297,36 @@ module.exports.subcommands.remove = {
 				 " [hid] [user] [user] ... - Remove users from a support ticket with the given hid"],
 	desc: ()=> "Users can be @mentions or user IDs. You cannot remove the ticket opener from the ticket via commands.",
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide users to remove from the ticket");
+		if(!args[0]) return "Please provide users to remove from the ticket";
 
 		var ids;
-		var ticket = await bot.utils.getSupportTicket(bot, msg.guild.id, args[0].toLowerCase());
+		var ticket = await bot.stores.tickets.get(msg.guild.id, args[0].toLowerCase());
 		if(ticket) ids = args.slice(1).map(id => id.replace(/[<@!>]/g,""));
 		else {
-			ticket = await bot.utils.getSupportTicketByChannel(bot, msg.guild.id, msg.channel.id);
+			ticket = await bot.stores.tickets.getByChannel(msg.guild.id, msg.channel.id);
 			ids = args.map(id => id.replace(/[<@!>]/g,""))
 		}
-		if(!ticket) return msg.channel.createMessage("Please provide a valid ticket hid or use this command in a ticket channel");
-
-		ids = ids.filter(id => ticket.userids.includes(id) && id != ticket.opener.id);
-
-		var members = msg.guild.members.filter(m => ids.includes(m.id));
-		if(!members || !members[0]) return msg.channel.createMessage("Please provide valid members to add to the ticket");
+		if(!ticket) return "Please provide a valid ticket hid or use this command in a ticket channel";
 
 		var channel = msg.guild.channels.find(c => c.id == ticket.channel_id);
-		if(!channel) return msg.channel.createMessage("ERR: Couldn't get the channel associated with that ticket");
+		if(!channel) return "Couldn't get the channel associated with that ticket";
+
+		ids = ids.filter(id => ticket.user_ids.includes(id) && id != ticket.opener_id);
+
+		var members = msg.guild.members.filter(m => ids.includes(m.id)).map(m => m.id);
+		if(!members || !members[0]) return "Please provide valid members to add to the ticket";
 
 		try {
-			await Promise.all(members.map(m => {
-				return channel.editPermission(m.id, 0, 1024, "member");
-			}))
+			for(var m of members) {
+				await channel.editPermission(m, 0, 1024, "member");
+			}
+			await bot.stores.tickets.update(msg.guild.id, ticket.hid, {users: members});
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("ERR:\n"+e.message);
+			return "ERR: "+(e.message || e);
 		}
 
-		var message = await msg.channel.getMessage(ticket.first_message);
-		if(!message) msg.channel.createMessage("Couldn't get the ticket's first message; users have been added, but won't be shown there")
-		else {
-			try {
-				await message.edit({embed: {
-					title: "Ticket opened!",
-					fields: [
-						{name: "Ticket Opener", value: message.embeds[0].fields[0].value},
-						{name: "Ticket Users", value: message.embeds[0].fields[1].value.split("\n").filter(m => !ids.includes(m.replace(/[<@!>]/g,""))).join("\n")}
-					],
-					color: 2074412,
-					footer: {
-						text: "Ticket ID: "+ticket.hid
-					},
-					timestamp: ticket.timestamp
-				}})
-			} catch(e) {
-				console.log(e);
-				msg.channel.createMessage("Couldn't edit ticket message; users have been removed, but won't be reflected there");
-			}
-		}
-
-		var scc = await bot.utils.editSupportTicket(bot, msg.guild.id, ticket.hid, "users", ticket.userids.filter(u => !ids.includes(u)));
-		if(scc) msg.channel.createMessage("Users removed from ticket!");
-		else msg.channel.createMessage("Users removed from channel, but could not be saved to the ticket");
-
+		return "Users removed from ticket!";
 	},
 	permissions: ['manageMessages'],
 	guildOnly: true
@@ -410,30 +334,32 @@ module.exports.subcommands.remove = {
 
 module.exports.subcommands.bind = {
 	help: ()=> "Bind the ticket starter reaction to a custom message",
-	usage: ()=> [" [channel] [messageID] - Bind the reaction to a message"],
+	usage: ()=> [" <channel> [messageID] - Bind the reaction to a message. If no channel is given, tries to find the message in the current channel"],
 	desc: ()=> "The channel can be a #mention, ID, or channel-name",
 	execute: async (bot, msg, args) => {
-		if(!args[1]) return msg.channel.createMessage("Please provide the channel and message ID to bind the reaction to");
+		if(!args[0]) return "Please provide at least a message ID to bind the reaction to";
 
-		var cfg = await bot.utils.getSupportConfig(bot, msg.guild.id);
-		if(!cfg) return msg.channel.createMessage("Please run `hub!ticket config setup` before doing this");
+		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
+		if(!cfg) return "Please run `hub!ticket config setup` before doing this";
 
-		var channel = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
-		if(!channel) return msg.channel.createMessage("Channel not found");
-		var message = await bot.getMessage(channel.id, args[1]);
-		if(!message) return msg.channel.createMessage("Message not found");
-
+		var channel;
+		var message;
 		try {
-			message.addReaction("✅")
+			if(args[1]) channel = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
+			else channel = msg.channel;
+			message = await bot.getMessage(channel.id, args[1]);
+
+			if(!channel) return "Channel not found";
+			if(!message) return "Message not found";
+
+			message.addReaction("✅");
+			await bot.stores.ticketPosts.create(msg.guild.id, message.channel.id, message.id);
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("ERR: Couldn't add the reaction; aborting");
+			return "ERR: "+(e.message || e);
 		}
 
-		var scc = await bot.utils.addTicketPost(bot, msg.guild.id, message.channel.id, message.id);
-		if(scc) msg.channel.createMessage("Reaction bound!");
-		else msg.channel.createMessage("Something went wrong")		
-
+		return "Reaction bound!";
 	},
 	permissions: ["manageMessages"],
 	guildOnly: true
@@ -444,23 +370,29 @@ module.exports.subcommands.unbind = {
 	usage: ()=> [" [channel] [messageID] - Unbind the reaction from a message"],
 	desc: ()=> "The channel can be a #mention, ID, or channel-name",
 	execute: async (bot, msg, args) => {
-		if(!args[1]) return msg.channel.createMessage("Please provide the channel and message ID to unbind the reaction from");
+		if(!args[0]) return "Please provide at least a message ID to bind the reaction to";
 
-		var channel = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
-		if(!channel) return msg.channel.createMessage("Channel not found");
-		var message = await bot.getMessage(channel.id, args[1]);
-		if(!message) return msg.channel.createMessage("Message not found");
+		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
+		if(!cfg) return "Please run `hub!ticket config setup` before doing this";
 
+		var channel;
+		var message;
 		try {
-			message.removeReaction("✅")
+			if(args[1]) channel = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
+			else channel = msg.channel;
+			message = await bot.getMessage(channel.id, args[1]);
+
+			if(!channel) return "Channel not found";
+			if(!message) return "Message not found";
+
+			message.removeReaction("✅");
+			await bot.stores.ticketPosts.delete(msg.guild.id, message.id);
 		} catch(e) {
 			console.log(e);
-			return msg.channel.createMessage("ERR: Couldn't remove the reaction; aborting");
+			return "ERR: "+(e.message || e);
 		}
 
-		var scc = await bot.utils.deleteTicketPost(bot, msg.guild.id, message.channel.id, message.id);
-		if(scc) msg.channel.createMessage("Reaction unbound!");
-		else msg.channel.createMessage("Something went wrong")		
+		return "Reaction unbound!";	
 
 	},
 	permissions: ["manageMessages"],
@@ -472,15 +404,25 @@ module.exports.subcommands.find = {
 	usage: ()=> [" [user] - Find tickets from the given user"],
 	desc: ()=> "User can be a @mention or ID. Does not include past tickets, as those are fully deleted from the database",
 	execute: async (bot, msg, args) => {
-		if(!args[0]) return msg.channel.createMessage("Please provide a user to search for tickets from");
+		if(!args[0]) return "Please provide a user to search for tickets from";
 
-		var tickets = await bot.utils.getSupportTicketsByUser(bot, msg.guild.id, args[0].replace(/[<@!>]/g,""));
+		var tickets = await bot.stores.tickets.getByUser(msg.guild.id, args[0].replace(/[<@!>]/g,""));
+		if(!tickets || !tickets[0]) return "No tickets found from that user";
 
-		if(!tickets) return msg.channel.createMessage("No tickets from that user found");
+		var embeds = await bot.utils.genEmbeds(bot, tickets, async dat => {
+			return {
+				name: `Ticket ${dat.hid}`,
+				value: [
+					`[first message](https://discordapp.com/channels/${msg.guild.id}/${dat.channel_id}/${dat.first_message})`,
+					`Opener: ${dat.opener.username}#${dat.opener.discriminator} (${dat.opener.id})`
+					`Users:\n${dat.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")}`
+				].join("\n\n")
+			}
+		}, {
+			title: `Support tickets from ${tickets[0].opener.username}#${tickets[0].opener.discriminator}`,
+			description: `Total tickets: ${tickets.length}`
+		});
 
-		msg.channel.createMessage({embed: {
-			title: "Tickets Found",
-			description: tickets.map(t => `ID: ${t.hid} | Opened: ${bot.formatTime(new Date(t.timestamp))}`).join("\n")
-		}})
+		return embeds;
 	}
 }

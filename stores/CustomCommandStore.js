@@ -18,13 +18,35 @@ class CommandStore extends Collection {
 					target,
 					del
 				) VALUES ($1,$2,$3,$4,$5)`,
-				[server, name, data.actions || [], data.target || "member", data.del || false]);
+				[server, name, JSON.stringify( data.actions || []), data.target || "member", data.del || false]);
+				//have to manually stringify JSON arrays due to bug in pg lib
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
 			}
 
-	 		res(await this.get(`${server}-${name}`));
+	 		res(await this.get(server, name));
+		})
+	}
+
+	async index(server, name, data = {}) {
+		return new Promise(async (res, rej) => {
+			try {
+				await this.db.query(`INSERT INTO commands (
+					server_id,
+					name,
+					actions,
+					target,
+					del
+				) VALUES ($1,$2,$3,$4,$5)`,
+				[server, name, JSON.stringify( data.actions || []), data.target || "member", data.del || false]);
+				//have to manually stringify JSON arrays due to bug in pg lib
+			} catch(e) {
+				console.log(e);
+		 		return rej(e.message);
+			}
+
+	 		res();
 		})
 	}
 
@@ -68,6 +90,7 @@ class CommandStore extends Collection {
 	async update(server, name, data) {
 		return new Promise(async (res, rej) => {
 			try {
+				if(data.actions) data.actions = JSON.stringify(data.actions);
 				await this.db.query(`UPDATE commands SET ${Object.keys(data).map((k, i) => k+"=$"+(i+3)).join(",")} WHERE server_id = $1 AND name = $2`,[server, name, ...Object.values(data)]);
 			} catch(e) {
 				console.log(e);
@@ -107,7 +130,7 @@ class CommandStore extends Collection {
 				return rej(e.message);
 			}
 			
-			for(command of commands )super.delete(`${server}-${command.name}`);
+			for(command of commands) super.delete(`${server}-${command.name}`);
 			res();
 		})
 	}
