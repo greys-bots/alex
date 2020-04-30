@@ -56,7 +56,7 @@ module.exports = {
 module.exports.subcommands.edit = {
 	help: ()=> "Edit a denial message",
 	usage: ()=> [" [logID] [new message] - Edits the message on a denial log"],
-	desc: ()=> "You can also use `hub!delist edit [id] [reason]` to edit denial logs",
+	desc: ()=> "You can also use `ha!delist edit [id] [reason]` to edit denial logs",
 	execute: async (bot, msg, args) => {
 		if(!args[1]) return "Please provide a log ID and a reason";
 		var log = await bot.stores.listingLogs.get(msg.guild.id, args[0].toLowerCase());

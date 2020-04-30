@@ -226,7 +226,7 @@ module.exports.subcommands.edit = {
 }
 
 module.exports.subcommands.notification = {
-	help: ()=> "Sets the channel for ban notifications from a host server, or notifications back from synced servers. For use with `hub!sync`",
+	help: ()=> "Sets the channel for ban notifications from a host server, or notifications back from synced servers. For use with `ha!sync`",
 	usage: ()=> [" [channel] - Sets the ban notifs channel"],
 	desc: ()=> "The channel can be a #channel, ID, or channel-name",
 	execute: async (bot, msg, args) => {

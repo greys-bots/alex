@@ -10,7 +10,7 @@ module.exports = {
 				 " deny [serverID] - Manually denies a server's sync request. Can be used even after accepting a request",
 				 " cancel - Cancels your current sync request, if you have one open"],
 	desc: ()=> ["This command syncs your server with a host server, giving you ban updates (configured ",
-				"with `hub!ban notifs [channel]`) and syncing your member count, server name, and server icon with your server's listings."].join(""),
+				"with `ha!ban notifs [channel]`) and syncing your member count, server name, and server icon with your server's listings."].join(""),
 	execute: async (bot, msg, args) => {
 		var cfg = await bot.stores.syncConfigs.get(msg.guild.id);
 

@@ -10,7 +10,7 @@ module.exports = {
 				 " archive <hid> - Archive a ticket (sends text transcript to command user and deletes channel)",
 				 " delete [hid] - Delete a ticket. NOTE: Does not archive it automatically; use this if you don't plan on archiving it",
 				 " config - Configure the ticket system"],
-	desc: ()=> "Before using this, you should run `hub!ticket config`. Use `hub!ticket post [channel]` or `hub!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
+	desc: ()=> "Before using this, you should run `ha!ticket config`. Use `ha!ticket post [channel]` or `ha!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
 	execute: async (bot, msg, args) => {
 		var tickets = await bot.stores.tickets.getAll(msg.guild.id);
 		if(!tickets || !tickets[0]) return "No support tickets registered for this server";
@@ -340,7 +340,7 @@ module.exports.subcommands.bind = {
 		if(!args[0]) return "Please provide at least a message ID to bind the reaction to";
 
 		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
-		if(!cfg) return "Please run `hub!ticket config setup` before doing this";
+		if(!cfg) return "Please run `ha!ticket config setup` before doing this";
 
 		var channel;
 		var message;
@@ -373,7 +373,7 @@ module.exports.subcommands.unbind = {
 		if(!args[0]) return "Please provide at least a message ID to bind the reaction to";
 
 		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
-		if(!cfg) return "Please run `hub!ticket config setup` before doing this";
+		if(!cfg) return "Please run `ha!ticket config setup` before doing this";
 
 		var channel;
 		var message;
