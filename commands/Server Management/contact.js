@@ -13,9 +13,9 @@ module.exports = {
 			var contacts = await bot.utils.verifyUsers(bot, guild.contact_id);
 			return {embed: {
 				fields: [
-					{name: "Current Contacts", value: dat.info.map(u => u.mention).join("\n")}
+					{name: "Current Contacts", value: contacts.info.map(u => u.mention).join("\n")}
 				],
-				footer: {text: `Server ID: ${guild.id}`}
+				footer: {text: `Server ID: ${guild.server_id}`}
 			}}
 		}
 

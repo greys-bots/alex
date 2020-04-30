@@ -34,8 +34,19 @@ module.exports = async (bot) => {
 	        ban_message 	TEXT,
 	        reprole 		TEXT,
 	        delist_channel	TEXT,
+	        edit_channel 	TEXT,
 	        starboard 		TEXT,
 	        blacklist 		TEXT[]
+	    );
+
+	    CREATE TABLE IF NOT EXISTS edit_requests (
+	    	id 				SERIAL PRIMARY KEY,
+	    	host_id 		TEXT,
+	    	channel_id		TEXT,
+	    	message_id		TEXT,
+	    	server_id		TEXT,
+	    	user_id			TEXT,
+	    	data			JSONB
 	    );
 
 	    CREATE TABLE IF NOT EXISTS feedback_configs (

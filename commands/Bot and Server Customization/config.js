@@ -3,7 +3,8 @@ module.exports = {
 	usage: ()=> [" banlog [channel] - Sets banlog channel for the server",
 				 " banmsg [message] - Sets ban message for the server (this is what users are DM'd upon being banned, as long as they were in the server first)",
 				 " delist [channe] - Sets delist/deny channel for the server",
-				 " reprole [role] - Sets representative role for the server"],
+				 " reprole [role] - Sets representative role for the server",
+				 " edit [channel] - Sets the edit request channel for the server"],
 	desc: ()=> ["Channels can be channel-names, #mentions, or IDs. The role can be a role name, @mention, or ID",
 				"Available vars for ban messages:",
 				"$REASON - The reason a user was banned",
@@ -15,6 +16,7 @@ module.exports = {
 		var bchan = conf.banlog_channel ? msg.guild.channels.find(c => c.id == conf.banlog_channel) : undefined;
 		var rrole = conf.reprole ?  msg.guild.roles.find(rl => rl.id == conf.reprole) : undefined;
 		var dchan = conf.delist_channel ? msg.guild.channels.find(ch => ch.id == conf.delist_channel) : undefined;
+		var echan = conf.edit_channel ? msg.guild.channels.find(ch => ch.id == conf.edit_channel) : undefined;
 
 		return {embed: {
 			title: "Server Config",
@@ -22,7 +24,8 @@ module.exports = {
 				{name: "Ban Log Channel", value: bchan ? bchan.mention : "(not set)"},
 				{name: "Ban Message", value: conf.ban_message ? conf.ban_message : "(not set)"},
 				{name: "Delist/Denial Log Channel", value: dchan ? dchan.mention : "(not set)"},
-				{name: "Representative Role", value: rrole ? rrole.mention : "(not set)"}
+				{name: "Representative Role", value: rrole ? rrole.mention : "(not set)"},
+				{name: "Edit Requests Channel", value: echan ? echan.mention : "(not set)"}
 			]
 		}};
 	},
@@ -36,7 +39,7 @@ module.exports.subcommands.banlog = {
 	help: ()=> "Sets banlog channel",
 	usage: ()=> [" [channel] - Sets banlog channel for the server (NOTE: can be channel ID, channel mention, or channel name"],
 	execute: async (bot, msg, args)=> {
-		if(!args[0]) return 'Please provide a channel.';
+		if(!args[0]) return 'Please provide a channel';
 
 		var cfg = await bot.stores.configs.get(msg.guild.id);
 
@@ -76,7 +79,7 @@ module.exports.subcommands.reprole = {
 	help: ()=> "Sets server rep role",
 	usage: ()=> [" [role] - Sets rep role for the server (NOTE: can be role ID, role mention, or role name"],
 	execute: async (bot, msg, args)=> {
-		if(!args[0]) return 'Please provide a channel.';
+		if(!args[0]) return 'Please provide a role';
 
 		var cfg = await bot.stores.configs.get(msg.guild.id);
 
@@ -97,7 +100,7 @@ module.exports.subcommands.delist = {
 	help: ()=> "Sets delist channel",
 	usage: ()=> [" [channel] - Sets delist channel for the server (NOTE: can be channel ID, channel mention, or channel name"],
 	execute: async (bot, msg, args)=> {
-		if(!args[0]) return 'Please provide a channel.';
+		if(!args[0]) return 'Please provide a channel';
 
 		var cfg = await bot.stores.configs.get(msg.guild.id);
 
@@ -112,6 +115,31 @@ module.exports.subcommands.delist = {
 
 	},
 	alias: ['delistchannel', "delete", "delisting", "deletechannel", "denychannel", "deny"],
+	permissions: ["manageMessages"],
+	guildOnly: true
+}
+
+module.exports.subcommands.edit = {
+	help: ()=> "Sets edit request channel",
+	usage: ()=> [" [channel] - Sets edit request channel for the server (NOTE: can be channel ID, channel mention, or channel name"],
+	execute: async (bot, msg, args)=> {
+		if(!args[0]) return 'Please provide a channel';
+
+		var cfg = await bot.stores.configs.get(msg.guild.id);
+
+		var chan = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
+		if(!chan) return "Channel not found";
+
+		try {
+			if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {edit_channel: chan.id});
+			else scc = await bot.stores.configs.create(msg.guild.id, {edit_channel: chan.id});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "Edit request channel set!";
+	},
+	alias: ['editchannel', "requestchannel", "editchan", "requestchan", "request", "edits", "requests"],
 	permissions: ["manageMessages"],
 	guildOnly: true
 }

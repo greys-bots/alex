@@ -68,7 +68,8 @@ class SyncConfigStore extends Collection {
 				return rej(e.message);
 			}
 
-			if(data.row && data.rows[0]) {
+			if(data.rows && data.rows[0]) {
+				console.log(data.rows[0]);
 				this.set(server, data.rows[0])
 				res(data.rows[0])
 			} else res(undefined);

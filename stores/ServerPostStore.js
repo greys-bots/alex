@@ -70,6 +70,10 @@ class ServerPostStore extends Collection {
 				await this.updateByServer(guild.id);
 			});
 		})
+
+		this.bot.on("messageReactionAdd", async (...args) => {
+			await this.handleReactions(...args);
+		})
 	}
 
 	async create(host, server, channel, message, data = {}) {
@@ -257,7 +261,6 @@ class ServerPostStore extends Collection {
 			try {
 				var post = await this.get(host, message);
 				console.log(post);
-				console.log(data);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -293,7 +296,7 @@ class ServerPostStore extends Collection {
 					fields: [
 						{name: "Contact", value: data.contacts},
 						{name: "Link", value: data.invite},
-						{name: "Members", value: this.bot.guilds.find(g => g.id == data.server_id) ? this.bot.guilds.find(g => g.id == server.server_id).memberCount : "(unavailable)"}
+						{name: "Members", value: post.server && post.server.guild ? post.server.guild.memberCount : "(unavailable)"}
 					],
 					thumbnail: {
 						url: data.pic_url || ""
@@ -383,6 +386,218 @@ class ServerPostStore extends Collection {
 			}
 			
 			res();
+		})
+	}
+
+	async handleReactions(message, emoji, user) {
+		return new Promise(async (res, rej) => {
+			if(this.bot.user.id == user) return res();
+			if(!["📝", "✏️"].includes(emoji.name)) return res();
+			try {
+				message = await this.bot.getMessage(message.channel.id, message.id);
+				var member = await this.bot.users.find(m => m.id == user);
+				if(!member) return rej("Couldn't get user");
+			} catch(e) {
+				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
+				return rej(e.message);
+			}
+
+			if(!message.guild) return res();
+
+			var post = await this.get(message.guild.id, message.id);
+			if(!post) return res();
+			await this.bot.removeMessageReaction(message.channel.id, message.id, emoji.name, user);
+
+			var channel = await this.bot.getDMChannel(user);
+			if(!post.server.contact_id || !post.server.contact_id.includes(user)) {
+				try {
+					await channel.createMessage("You aren't a contact for that server, and thus cannot edit it");
+				} catch(e) {
+					console.log(e);
+					return rej(e.message);
+				}
+				
+				return res();
+			}
+
+			var config = await this.bot.stores.configs.get(message.guild.id);
+			if(!config || !config.edit_channel || !message.guild.channels.find(c => c.id == config.edit_channel))
+				return await channel.createMessage("That guild isn't currently accepting edit requests");
+
+			var out = await this.bot.stores.editRequests.search(message.guild.id, {server_id: post.server.server_id});
+			if(out) {
+				await channel.createMessage("There is already an outgoing edit request for that server!");
+				return res();
+			}
+
+			var data = {
+				name: post.server.name || post.message.embeds[0].title,
+				description: post.server.description || post.message.embeds[0].description,
+				invite: post.server.invite || post.message.embeds[0].fields[1].value,
+				pic_url: post.server.pic_url || (post.message.embeds[0].thumbnail ? post.message.embeds[0].thumbnail.url : null),
+				color: post.server.color,
+				contact_id: post.server.contact_id,
+				visibility: post.server.visibility
+			};
+
+			if(post.server.contact_id) {
+				data.contacts = await this.bot.utils.verifyUsers(this.bot, post.server.contact_id);
+				if(!data.contacts.pass[0]) return rej("Contacts invalid");
+				data.contacts = data.contacts.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n");
+			} else data.contacts = "(no contacts provided)";
+
+			var done = false;
+			var loops = 3;
+			var response;
+			while(!done && loops > 0) {
+				await channel.createMessage({
+					content: [
+						"What would you like to edit?\n",
+						"```yaml\n",
+						"1 - Server name\n",
+						"2 - Server description\n",
+						"3 - Server invite\n",
+						"4 - Server icon\n",
+						"5 - Server color\n",
+						"6 - Server visibility\n",
+						"```\n",
+						"Below is a preview of your server.",
+						" Note that completing this process won't immediately update anything;",
+						" all desired edits will be sent as a request to the mods, and they can be denied\n",
+						"Also note that you may only edit up to three values at once"
+					].join(""),
+					embed: {
+						title: data.name || "(unnamed)",
+						description: data.description || "(no description provided)",
+						fields: [
+							{name: "Contact", value: data.contacts},
+							{name: "Link", value: data.invite},
+							{name: "Members", value: post.server.guild ? post.server.guild.memberCount : "(unavailable)"}
+						],
+						thumbnail: {
+							url: data.pic_url || ""
+						},
+						color: parseInt(data.color || '3498DB', 16),
+						footer: {
+							text: `ID: ${post.server.server_id} | This server ${data.visibility ? "is" : "is not"} visible on the website`
+						}
+					}
+				});
+
+				try {
+					response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
+					switch(response) {
+						case "1":
+							await channel.createMessage("Enter the new name. You have 2 minutes to do this");
+							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*5, maxMatches: 1, }))[0].content;
+							data.name = response;
+							break;
+						case "2":
+							await channel.createMessage("Enter the new description. You have 5 minutes to do this");
+							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*5, maxMatches: 1, }))[0].content;
+							data.description = response;
+							break;
+						case "3":
+							await channel.createMessage("Enter the new invite. You have 2 minutes to do this");
+							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*2, maxMatches: 1, }))[0].content;
+							data.invite = response;
+							break;
+						case "4":
+							await channel.createMessage("Enter or attach the new icon. You have 3 minutes to do this");
+							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0];
+							if(response.attachments && response.attachments[0]) data.pic_url = response.attachments[0].url;
+							else data.pic_url = response.content;
+							break;
+						case "5":
+							await channel.createMessage("Enter the new color. You have 2 minutes to do this");
+							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*2, maxMatches: 1, }))[0].content;
+							var color = this.bot.tc(response.split(" ").join(""));
+							if(!color.isValid()) {
+								await channel.createMessage("That color is invalid! Aborting...");
+								return res();
+							}
+							data.color = color.toHex();
+							break;
+						case "6":
+							await channel.createMessage("Enter the new value (true/false). You have 2 minutes to do this");
+							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*2, maxMatches: 1, }))[0].content;
+							if(response == "true") data.visibility = true;
+							else data.visibility = false;
+							break;
+						default:
+							await channel.createMessage("Invalid input! Aborting...");
+							return res();
+							break;
+					}
+				} catch(e) {
+					console.log(e);
+					await channel.createMessage("ERR: "+e.message);
+					return rej(e.message);
+				}
+
+				loops--;
+				if(loops <= 0) break;
+
+				await channel.createMessage("Would you like to edit something else? (y/n)");
+				response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0].content.toLowerCase();
+				if(!["y", "yes"].includes(response)) {
+					done = true;
+					break;
+				};
+			}
+
+			await channel.createMessage({content: "Is this okay? (y/n)", embed: {
+				title: data.name || "(unnamed)",
+				description: data.description || "(no description provided)",
+				fields: [
+					{name: "Contact", value: data.contacts},
+					{name: "Link", value: data.invite},
+					{name: "Members", value: post.server.guild ? post.server.guild.memberCount : "(unavailable)"}
+				],
+				thumbnail: {
+					url: data.pic_url || ""
+				},
+				color: parseInt(data.color || '3498DB', 16),
+				footer: {
+					text: `ID: ${post.server.server_id} | This server ${data.visibility ? "is" : "is not"} visible on the website`
+				}
+			}});
+
+			response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0].content.toLowerCase();
+			if(!["y", "yes"].includes(response)) return await channel.createMessage("Action cancelled");
+
+			try {
+				var echannel = message.guild.channels.find(c => c.id == config.edit_channel);
+				var msg = await echannel.createMessage({content: "New edit request!", embed: {
+					title: data.name || "(unnamed)",
+					description: data.description || "(no description provided)",
+					fields: [
+						{name: "Contact", value: data.contacts},
+						{name: "Link", value: data.invite},
+						{name: "Members", value: post.server.guild ? post.server.guild.memberCount : "(unavailable)"}
+					],
+					thumbnail: {
+						url: data.pic_url || ""
+					},
+					color: parseInt(data.color || '3498DB', 16),
+					footer: {
+						text: `ID: ${post.server.server_id} | This server ${data.visibility ? "is" : "is not"} visible on the website`
+					},
+					author: {
+						name: `Requested by: ${member.username}#${member.discriminator}`,
+						icon_url: member.avatarURL
+					},
+					timestamp: new Date().toISOString()
+				}});
+				["✅", "❌"].forEach(r => msg.addReaction(r));
+				delete data.contacts;
+				await this.bot.stores.editRequests.create(message.guild.id, echannel.id, msg.id, post.server.server_id, user, data);
+				await channel.createMessage("Your edit request has been sent. You'll receive a notification once it has been accepted");
+			} catch(e) {
+				console.log(e);
+				await channel.createMessage("ERR: "+ (e.message || e));
+				rej(e.message || e);
+			}
 		})
 	}
 }

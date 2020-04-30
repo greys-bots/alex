@@ -224,7 +224,7 @@ module.exports.subcommands.deny = {
 		}
 
 		try {
-			await bot.stores.syncConfigs.update(request.requester, {confirmed: false, sync_id: ""});
+			await bot.stores.syncConfigs.update(request.requester, {confirmed: false, sync_id: null});
 		} catch(e) {
 			return "ERR: "+e;
 		}
@@ -399,7 +399,8 @@ module.exports.subcommands.setup = {
 				
 				try {
 					await bot.stores.syncMenus.create(message.guild.id, message.channel.id, message.id, {type: 0, reply_guild: msg.guild.id, reply_channel: schan.id});
-					await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: sguild.server_id, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
+					if(cfg) await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: sguild.server_id, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
+					else await bot.stores.syncConfigs.create(msg.guild.id, {syncable: false, confirmed: false, sync_id: sguild.server_id, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
 				} catch(e) {
 					return "ERR: "+e;
 				}
@@ -441,7 +442,7 @@ module.exports.subcommands.setup = {
 						}
 
 						try {
-							await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: ""});
+							await bot.stores.syncConfigs.update(msg.guild.id, {syncable: false, confirmed: false, sync_id: null});
 						} catch(e) {
 							return "ERR: "+e;
 						}
@@ -460,7 +461,9 @@ module.exports.subcommands.setup = {
 				if(!bchan) return "ERR: couldn't find the given channel. Aborting";
 
 				try {
-					await bot.stores.syncConfigs.update(msg.guild.id, {syncable: true, confirmed: false, sync_id: "", sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
+					console.log(cfg);
+					if(cfg) await bot.stores.syncConfigs.update(msg.guild.id, {syncable: true, confirmed: false, sync_id: null, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
+					else await bot.stores.syncConfigs.create(msg.guild.id, {syncable: true, confirmed: false, sync_id: null, sync_notifs: schan.id, ban_notifs: bchan.id, enabled: true});
 				} catch(e) {
 					return "ERR: "+e;
 				}
@@ -485,30 +488,30 @@ module.exports.subcommands.cancel = {
 		if(!cfg || !cfg.sync_id) return "Nothing to cancel";
 
 		var request = await bot.stores.syncMenus.getRequest(cfg.sync_id, msg.guild.id);
+		console.log(request);
 
 		if(request && request.message) {
 			var message;
 			try {
 				var message = await bot.getMessage(request.channel, request.message);
+				console.log(message ? 'message found' : ':(')
 				if(message) {
-					if(message) {
-						var embed = message.embeds[0];
-						embed.fields[2].value = "Cancelled";
-						embed.color = parseInt("aa5555",16);
-						embed.author = {
-							name: `Cancelled by: ${msg.author.username}#${msg.author.discriminator} (${msg.author.id})`,
-							icon_url: msg.author.avatarURL
-						}
-						await bot.editMessage(req.channel, req.message, {embed: embed});
-						await bot.stores.syncMenus.delete(message.channel.guild.id, message.channel.id, message.id);
-
-						await message.channel.createMessage({embed: {
-							title: "Sync Cancellation",
-							description: `The sync request from ${msg.guild.name} (${msg.guild.id}) has been cancelled.`,
-							color: parseInt("aa5555", 16),
-							timestamp: new Date().toISOString()
-						}});
+					var embed = message.embeds[0];
+					embed.fields[2].value = "Cancelled";
+					embed.color = parseInt("aa5555",16);
+					embed.author = {
+						name: `Cancelled by: ${msg.author.username}#${msg.author.discriminator} (${msg.author.id})`,
+						icon_url: msg.author.avatarURL
 					}
+					await bot.editMessage(request.channel, request.message, {embed: embed});
+					await bot.stores.syncMenus.delete(message.channel.guild.id, message.channel.id, message.id);
+
+					await message.channel.createMessage({embed: {
+						title: "Sync Cancellation",
+						description: `The sync request from ${msg.guild.name} (${msg.guild.id}) has been cancelled.`,
+						color: parseInt("aa5555", 16),
+						timestamp: new Date().toISOString()
+					}});
 				}
 			} catch(e) {
 				console.log(e);
@@ -517,7 +520,7 @@ module.exports.subcommands.cancel = {
 		}
 
 		try {
-			await bot.stores.syncConfigs.update(msg.guild.id, {confirmed: false, sync_id: ""});
+			await bot.stores.syncConfigs.update(msg.guild.id, {confirmed: false, sync_id: null});
 		} catch(e) {
 			return "ERR: "+e;
 		}

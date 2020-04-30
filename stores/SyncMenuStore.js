@@ -8,6 +8,27 @@ class SyncMenuStore extends Collection {
 		this.bot = bot;
 	};
 
+	async init() {
+		this.bot.on("messageReactionAdd", async (...args) => {
+			await this.handleReactions(...args);
+		})
+
+		this.bot.on('messageDelete', async (msg) => {
+			return new Promise(async (res, rej) => {
+				if(msg.channel.type == 1) return;
+
+				try {
+					var menu = await this.get(msg.channel.guild.id, msg.channel.id, msg.id);
+					if(!menu) return res();
+					await this.delete(menu.server_id, menu.channel_id, menu.message_id);
+				} catch(e) {
+					console.log(e);
+					return rej(e.message || e);
+				}
+			})	
+		})
+	}
+
 	async create(server, channel, message, data = {}) {
 		return new Promise(async (res, rej) => {
 			try {
@@ -19,7 +40,7 @@ class SyncMenuStore extends Collection {
 					reply_guild,
 					reply_channel
 				) VALUES ($1,$2,$3,$4,$5,$6)`,
-				[server, channel, message, data.type, data.reply_server, data.reply_channel]);
+				[server, channel, message, data.type, data.reply_guild, data.reply_channel]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -71,15 +92,10 @@ class SyncMenuStore extends Collection {
 		})
 	}
 
-	async getRequest(server, requester, forceUpdate = false) {
+	async getRequest(server, requester) {
 		return new Promise(async (res, rej) => {
-			var cfg = await this.get(requester);
+			var cfg = await this.bot.stores.syncConfigs.get(requester);
 			if(!cfg || !cfg.sync_id || cfg.sync_id != server) return rej("Requester is not synced to that server");
-
-			if(!forceUpdate) {
-				var menu = super.get(`${server}-${requester}`);
-				if(menu) return res(menu);
-			}
 
 			try {
 				var data = await this.db.query(`SELECT * FROM sync_menus WHERE server_id = $1 AND reply_guild = $2`,[server, requester]);
@@ -89,23 +105,36 @@ class SyncMenuStore extends Collection {
 			}
 			
 			var request = {};
-			if(rows[0]) {
+			if(data.rows && data.rows[0]) {
+				for(var i = 0; i < data.rows.length; i++) {
+					try {
+						var msg = await this.bot.getMessage(data.rows[i].channel_id, data.rows[i].message_id);
+					} catch(e) {
+						console.log(e.message);
+					}
+					if(msg) continue;
+					else {
+						await this.delete(data.rows[i].server_id, data.rows[i].channel_id, data.rows[i].message_id);
+						data.rows[i] = undefined;
+					}
+				}
+
+				data.rows = data.rows.filter(x => x!=undefined);
 				request = {
 					channel: data.rows[0].channel_id,
 					message: data.rows[0].message_id,
 					requester: data.rows[0].reply_guild,
 					requester_channel: data.rows[0].reply_channel,
-					confirmed: scfg.confirmed
+					confirmed: cfg.confirmed
 				};
 			} else {
 				request = {
-					requester: scfg.server_id,
-					requester_channel: scfg.sync_notifs,
-					confirmed: scfg.confirmed
+					requester: cfg.server_id,
+					requester_channel: cfg.sync_notifs,
+					confirmed: cfg.confirmed
 				};
 			}
 
-			this.set(`${server}-${requester}`, request);
 			res(request);
 		})
 	}
@@ -133,6 +162,97 @@ class SyncMenuStore extends Collection {
 			}
 			
 			super.delete(`${server}-${channel}-${message}`);
+			res();
+		})
+	}
+
+	async handleReactions(message, emoji, user) {
+		return new Promise(async (res, rej) => {
+			if(this.bot.user.id == user) return res();
+			try {
+				message = await this.bot.getMessage(message.channel.id, message.id);
+				var smenu = await this.get(message.channel.guild.id, message.channel.id, message.id);
+				if(!smenu) return res();
+				if(!["✅", "❌"].includes(emoji.name)) return res();
+				var request = await this.getRequest(message.channel.guild.id, smenu.reply_guild);
+				if(!request) return res();
+				console.log(request);
+				var embed = message.embeds[0];
+				var member = await this.bot.utils.fetchUser(this.bot, user);
+				await this.bot.removeMessageReaction(message.channel.id, message.id, emoji.name, user);
+			} catch(e) {
+				console.log(e);
+				return rej(e.message || e);
+			}
+				
+			switch(emoji.name) {
+				case "✅":
+					if(request.confirmed) return res();
+
+					try {
+						if(embed) {
+							embed.fields[2].value = "Confirmed";
+							embed.color = parseInt("55aa55", 16);
+							embed.author = {
+								name: `Accepted by: ${member.username}#${member.discriminator} (${member.id})`,
+								icon_url: member.avatarURL
+							}
+							await this.bot.editMessage(message.channel.id, message.id, {embed: embed});
+						}
+					} catch(e) {
+						console.log(e);
+						message.channel.createMessage("Notification for this request couldn't be updated; the request can still be confirmed, however");
+					}
+
+					try {
+						await this.bot.stores.syncConfigs.update(smenu.reply_guild, {confirmed: true});
+						await this.bot.createMessage(smenu.reply_channel, {embed: {
+							title: "Sync Acceptance",
+							description: `Your sync request with ${message.guild.name} has been accepted!`,
+							color: parseInt("55aa55", 16),
+							timestamp: new Date().toISOString()
+						}});
+					} catch(e) {
+						console.log(e);
+						if(e.message) message.channel.createMessage("Couldn't send the requester the acceptance notification; please make sure they're aware that their server was accepted and that they should use `hub!ban notifs [channel]` if they want ban notifications");
+						else message.channel.createMessage("Couldn't update the request. Please try again");
+						return rej(e.message || e);
+					}
+					break;
+				case "❌":
+					try {
+						if(embed) {
+							embed.fields[2].value = "Denied";
+							embed.color = parseInt("aa5555", 16);
+							embed.author = {
+								name: `Denied by: ${member.username}#${member.discriminator} (${member.id})`,
+								icon_url: member.avatarURL
+							}
+							await this.bot.editMessage(message.channel.id, message.id, {embed: embed});
+							await this.delete(message.channel.guild.id, message.channel.id, message.id);
+						}
+					} catch(e) {
+						console.log(e);
+						message.channel.createMessage("Notification for this request couldn't be updated; the request can still be confirmed, however");
+					}
+
+					try {
+						await this.bot.stores.syncConfigs.update(smenu.reply_guild, {confirmed: false, sync_id: null});
+						await this.bot.createMessage(smenu.reply_channel, {embed: {
+							title: "Sync Denial",
+							description: `Your sync request with ${message.guild.name} has been denied.${request.confirmed ? " You'll no longer receive notifications from this server." : ""}`,
+							color: parseInt("aa5555", 16),
+							timestamp: new Date().toISOString()
+						}});
+						await this.bot.removeMessageReactions(message.channel.id, message.id);
+					} catch(e) {
+						console.log(e);
+						if(e.message) message.channel.createMessage("Couldn't send the requester the acceptance notification; please make sure they're aware that their server was accepted and that they should use `hub!ban notifs [channel]` if they want ban notifications");
+						else message.channel.createMessage("Couldn't update the request. Please try again");
+						return rej(e.message || e);
+					}
+					break;
+			}
 			res();
 		})
 	}
