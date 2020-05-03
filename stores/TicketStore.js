@@ -258,7 +258,7 @@ class TicketStore extends Collection {
 						title: "Ticket opened!",
 						fields: [
 							{name: "Ticket Opener", value: `<@${ticket.opener_id}>`},
-							{name: "Ticket Users", value: ticket.user_ids.map(u => `<@${u}>`)}
+							{name: "Ticket Users", value: [ticket.opener_id].concat(ticket.user_ids).map(u => `<@${u}>`).join('\n')}
 						],
 						color: 2074412,
 						footer: {

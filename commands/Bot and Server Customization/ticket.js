@@ -27,8 +27,6 @@ module.exports = {
 			}}
 		})
 
-		console.log(embeds[1]);
-
 		if(embeds[1]) for(var i = 0; i < embeds.length; i++) embeds[i].embed.title += ` (${i+1}/${embeds.length})`;
 
 		return embeds;
