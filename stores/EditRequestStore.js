@@ -184,7 +184,7 @@ class EditRequestStore extends Collection {
 				var member = await this.bot.utils.fetchUser(this.bot, user);
 				var channel = await this.bot.getDMChannel(request.user_id);
 			} catch(e) {
-				console.log(e);
+				if(!e.message.toLowerCase().includes('unknown message')) console.log(e.message || e);
 				return rej(e.message || e);
 			}
 				

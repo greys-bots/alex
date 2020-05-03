@@ -135,12 +135,10 @@ class TicketPostStore extends Collection {
 				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
 				return rej(e.message);
 			}
-			console.log(msg);
 
 			if(!msg.guild) return res();
 
 			var tpost = await this.get(msg.channel.guild.id, msg.id);
-			console.log(tpost);
 			if(!tpost) return res();
 			try {
 				await this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user);

@@ -15,19 +15,21 @@ module.exports = {
 		var tickets = await bot.stores.tickets.getAll(msg.guild.id);
 		if(!tickets || !tickets[0]) return "No support tickets registered for this server";
 
-		var embeds = await bot.utils.genEmbeds(bot, tickets, async dat => {
-			return {
-				name: `Ticket ${dat.hid}`,
-				value: [
-					`[first message](https://discordapp.com/channels/${msg.guild.id}/${dat.channel_id}/${dat.first_message})`,
-					`Opener: ${dat.opener.username}#${dat.opener.discriminator} (${dat.opener.id})`
-					`Users:\n${dat.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")}`
-				].join("\n\n")
-			}
-		}, {
-			title: "Server Suport Tickets",
-			description: `Total tickets: ${tickets.length}`
-		});
+		var embeds = tickets.map(t => {
+			return {embed: {
+				title: `Ticket ${t.hid}`,
+				fields: [
+					{name: "First message", value: `[clicky!](https://discordapp.com/channels/${msg.guild.id}/${t.channel_id}/${t.first_message})`},
+					{name: "Ticket opener", value: `${t.opener.mention} (${t.opener.username}#${t.opener.discriminator})`},
+					{name: "Ticket users", value: `${[t.opener].concat(t.users).map(u => `${u.mention} (${u.username}#${u.discriminator})`)}`}
+				],
+				timestamp: t.timestamp
+			}}
+		})
+
+		console.log(embeds[1]);
+
+		if(embeds[1]) for(var i = 0; i < embeds.length; i++) embeds[i].embed.title += ` (${i+1}/${embeds.length})`;
 
 		return embeds;
 	},

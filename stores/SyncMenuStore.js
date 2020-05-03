@@ -181,7 +181,7 @@ class SyncMenuStore extends Collection {
 				var member = await this.bot.utils.fetchUser(this.bot, user);
 				await this.bot.removeMessageReaction(message.channel.id, message.id, emoji.name, user);
 			} catch(e) {
-				console.log(e);
+				if(!e.message.toLowerCase().includes('unknown message')) console.log(e);
 				return rej(e.message || e);
 			}
 				
