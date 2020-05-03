@@ -36,7 +36,7 @@ class TicketPostStore extends Collection {
 	async create(server, channel, message, data = {}) {
 		return new Promise(async (res, rej) => {
 			try {
-				await this.db.query(`INSERT INTO posts (
+				await this.db.query(`INSERT INTO ticket_posts (
 					server_id,
 					channel_id,
 					message_id
@@ -54,7 +54,7 @@ class TicketPostStore extends Collection {
 	async index(server, channel, message, data = {}) {
 		return new Promise(async (res, rej) => {
 			try {
-				await this.db.query(`INSERT INTO posts (
+				await this.db.query(`INSERT INTO ticket_posts (
 					server_id,
 					channel_id,
 					message_id
@@ -77,7 +77,7 @@ class TicketPostStore extends Collection {
 			}
 
 			try {
-				var data = await this.db.query(`SELECT * FROM posts WHERE host_id = $1 AND message_id = $2`,[server, message]);
+				var data = await this.db.query(`SELECT * FROM ticket_posts WHERE server_id = $1 AND message_id = $2`,[server, message]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -93,7 +93,7 @@ class TicketPostStore extends Collection {
 	async getAll(server) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`SELECT * FROM posts WHERE host_id = $1`,[server]);
+				var data = await this.db.query(`SELECT * FROM ticket_posts WHERE server_id = $1`,[server]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -115,7 +115,7 @@ class TicketPostStore extends Collection {
 	async delete(server, message) {
 		return new Promise(async (res, rej) => {
 			try {
-				await this.db.query(`DELETE FROM posts WHERE server_id = $1 AND message_id = $2`, [server, message]);
+				await this.db.query(`DELETE FROM ticket_posts WHERE server_id = $1 AND message_id = $2`, [server, message]);
 				super.delete(`${server}-${message}`);
 			} catch(e) {
 				console.log(e);
@@ -135,10 +135,12 @@ class TicketPostStore extends Collection {
 				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
 				return rej(e.message);
 			}
+			console.log(msg);
 
 			if(!msg.guild) return res();
 
-			var tpost = await this.get(this.bot, msg.channel.guild.id, msg.id);
+			var tpost = await this.get(msg.channel.guild.id, msg.id);
+			console.log(tpost);
 			if(!tpost) return res();
 			try {
 				await this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user);
@@ -158,8 +160,8 @@ class TicketPostStore extends Collection {
 				}
 			}
 
-			var us = await this.bot.utils.fetchUser(bot, user);
-			var ticket = await this.bot.stores.tickets.create(msg.channel.guild.id, us);
+			var us = await this.bot.utils.fetchUser(this.bot, user);
+			var ticket = await this.bot.stores.tickets.create(msg.channel.guild.id, {opener: us});
 			if(!ticket.hid) {
 				try {
 					ch.createMessage("Couldn't open your support ticket:\n"+ticket.e);
@@ -168,7 +170,7 @@ class TicketPostStore extends Collection {
 					return rej(e.message);
 				}	
 			}
-			res(a);
+			res();
 		});
 	}
 }

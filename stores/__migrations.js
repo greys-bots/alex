@@ -325,7 +325,7 @@ async function migrate() {
 			}
 		})
 
-		old_db.query(`SELECT * FROM ticket_posts`, {
+		old_db.query(`SELECT * FROM tickets`, {
 			id: Number,
 			hid: String,
 			server_id: String,

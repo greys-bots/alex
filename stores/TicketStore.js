@@ -60,7 +60,7 @@ class TicketStore extends Collection {
 					timestamp
 				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 				[hid, server, channel.id, message.id,
-				data.opener, data.users || [], time]);
+				data.opener.id, data.users || [], time]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -112,12 +112,10 @@ class TicketStore extends Collection {
 				var opener;
 				try {
 					for(var id of data.rows[0].users) {
-						var user = bot.users.find(u => u.id == id);
-						if(!user) user = await bot.getRESTUser(id);
+						var user = await this.bot.utils.fetchUser(this.bot, id);
 						users.push(user);
 					}
-					opener = this.bot.users.find(u => u.id == data.rows[0].opener_id);
-					if(!opener) opener = await his.bot.getRESTUser(id);
+					opener = await this.bot.utils.fetchUser(this.bot, data.rows[0].opener)
 				} catch(e) {
 					console.log(e);
 				}
@@ -146,15 +144,12 @@ class TicketStore extends Collection {
 				var opener;
 				try {
 					for(var id of data.rows[0].users) {
-						var user = bot.users.find(u => u.id == id);
-						if(!user) user = await bot.getRESTUser(id);
+						var user = await this.bot.utils.fetchUser(this.bot, id);
 						users.push(user);
 					}
-					opener = bot.users.find(u => u.id == data.rows[0].opener);
-					if(!opener) opener = await bot.getRESTUser(data.rows[0].opener);
+					opener = await this.bot.utils.fetchUser(this.bot, data.rows[0].opener)
 				} catch(e) {
 					console.log(e);
-					continue;
 				}
 
 				data.rows[0].user_ids = data.rows[0].users;
@@ -182,12 +177,10 @@ class TicketStore extends Collection {
 					var opener;
 					try {
 						for(var id of data.rows[i].users) {
-							var user = bot.users.find(u => u.id == id);
-							if(!user) user = await bot.getRESTUser(id);
+							var user = await this.bot.utils.fetchUser(this.bot, id);
 							users.push(user);
 						}
-						opener = bot.users.find(u => u.id == data.rows[i].opener);
-						if(!opener) opener = await bot.getRESTUser(data.rows[i].opener);
+						opener = await this.bot.utils.fetchUser(this.bot, data.rows[i].opener)
 					} catch(e) {
 						console.log(e);
 						continue;
@@ -206,7 +199,7 @@ class TicketStore extends Collection {
 	async getByUser(server, user) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`SELECT * FROM tickets WHERE server_id = $1 AND opener_id = $2`,[server, user]);
+				var data = await this.db.query(`SELECT * FROM tickets WHERE server_id = $1 AND opener = $2`,[server, user]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -218,12 +211,10 @@ class TicketStore extends Collection {
 					var opener;
 					try {
 						for(var id of data.rows[i].users) {
-							var user = bot.users.find(u => u.id == id);
-							if(!user) user = await bot.getRESTUser(id);
+							var user = await this.bot.utils.fetchUser(this.bot, id);
 							users.push(user);
 						}
-						opener = bot.users.find(u => u.id == data.rows[i].opener);
-						if(!opener) opener = await bot.getRESTUser(data.rows[i].opener);
+						opener = await this.bot.utils.fetchUser(this.bot, data.rows[i].opener)
 					} catch(e) {
 						console.log(e);
 						continue;

@@ -46,11 +46,14 @@ module.exports.subcommands.banlog = {
 		var chan = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
 		if(!chan) return "Channel not found";
 
-		var scc;
-		if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {banlog_channel: chan.id});
-		else scc = await bot.stores.configs.create(msg.guild.id, {banlog_channel: chan.id});
-		if(scc) return "Banlog channel set!";
-		else return "Something went wrong";
+		try {
+			if(cfg) await bot.stores.configs.update(msg.guild.id, {banlog_channel: chan.id});
+			else await bot.stores.configs.create(msg.guild.id, {banlog_channel: chan.id});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "Banlog channel set!";
 	},
 	alias: ['banchannel', "banlogs", "banlogchannel"],
 	permissions: ["manageMessages"],
@@ -64,11 +67,14 @@ module.exports.subcommands.banmsg = {
 	execute: async (bot, msg, args) => {
 		var cfg = await bot.stores.configs.get(msg.guild.id);
 
-		var scc;
-		if(cfg) scc = await await bot.stores.configs.update(msg.guild.id, {ban_message: args.join(" ")});
-		else scc = await await bot.stores.configs.create(msg.guild.id, {ban_message: args.join(" ")});
-		if(scc) return "Ban message set!";
-		else return "Something went wrong";
+		try {
+			if(cfg) await bot.stores.configs.update(msg.guild.id, {ban_message: args.join(" ")});
+			else await bot.stores.configs.create(msg.guild.id, {ban_message: args.join(" ")});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "Ban message set!";
 	},
 	alias: ["banmessage","bm","banlogmessage","banlogmsg"],
 	permissions: ["manageGuild"],
@@ -86,11 +92,14 @@ module.exports.subcommands.reprole = {
 		var role = msg.guild.roles.find(rl => rl.id == args[0].replace(/[<&>]/g,"") || rl.name.toLowerCase() == args.join(" ").toLowerCase());
 		if(!role) return "Role not found";
 
-		var scc;
-		if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {reprole: role.id});
-		else scc = await bot.stores.configs.create(msg.guild.id, {reprole: role.id});
-		if(scc) return "Representative role set!";
-		else return "Something went wrong";
+		try {
+			if(cfg) await bot.stores.configs.update(msg.guild.id, {reprole: role.id});
+			else await bot.stores.configs.create(msg.guild.id, {reprole: role.id});
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "Representative role set!";
 	},
 	permissions: ["manageMessages"],
 	guildOnly: true
@@ -107,12 +116,14 @@ module.exports.subcommands.delist = {
 		var chan = msg.guild.channels.find(ch => ch.id == args[0].replace(/[<#>]/g,"") || ch.name == args[0].toLowerCase());
 		if(!chan) return "Channel not found";
 
-		var scc;
-		if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {delist_channel: chan.id});
-		else scc = await bot.stores.configs.create(msg.guild.id, {delist_channel: chan.id});
-		if(scc) return "Delist channel set!";
-		else return "Something went wrong";
+		try {
+			if(cfg) await bot.stores.configs.update(msg.guild.id, {delist_channel: chan.id});
+			else await bot.stores.configs.create(msg.guild.id, {delist_channel: chan.id});
+		} catch(e) {
+			return "ERR: "+e;
+		}
 
+		return "Delist channel set!";
 	},
 	alias: ['delistchannel', "delete", "delisting", "deletechannel", "denychannel", "deny"],
 	permissions: ["manageMessages"],
@@ -131,8 +142,8 @@ module.exports.subcommands.edit = {
 		if(!chan) return "Channel not found";
 
 		try {
-			if(cfg) scc = await bot.stores.configs.update(msg.guild.id, {edit_channel: chan.id});
-			else scc = await bot.stores.configs.create(msg.guild.id, {edit_channel: chan.id});
+			if(cfg) await bot.stores.configs.update(msg.guild.id, {edit_channel: chan.id});
+			else await bot.stores.configs.create(msg.guild.id, {edit_channel: chan.id});
 		} catch(e) {
 			return "ERR: "+e;
 		}
