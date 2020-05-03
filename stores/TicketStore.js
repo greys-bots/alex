@@ -122,6 +122,7 @@ class TicketStore extends Collection {
 
 				data.rows[0].user_ids = data.rows[0].users;
 				data.rows[0].users = users;
+				data.rows[0].opener_id = data.rows[0].opener;
 				data.rows[0].opener = opener;
 
 				this.set(`${server}-${hid}`, data.rows[0])
