@@ -10,7 +10,7 @@ module.exports = {
 				 " archive <hid> - Archive a ticket (sends text transcript to command user and deletes channel)",
 				 " delete [hid] - Delete a ticket. NOTE: Does not archive it automatically; use this if you don't plan on archiving it",
 				 " config - Configure the ticket system"],
-	desc: ()=> "Before using this, you should run `ha!ticket config`. Use `ha!ticket post [channel]` or `ha!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
+	desc: ()=> "Before using this, you should run `ha!ticket config setup`. Use `ha!ticket post [channel]` or `ha!ticket bind [channel] [messageID]` to open the system for reactions and ticket creation. Users can have a total of 5 tickets open at once to prevent spam.",
 	execute: async (bot, msg, args) => {
 		var tickets = await bot.stores.tickets.getAll(msg.guild.id);
 		if(!tickets || !tickets[0]) return "No support tickets registered for this server";
@@ -45,7 +45,7 @@ module.exports.subcommands.post = {
 		if(!args[0]) return "Please provide a channel to post to";
 
 		var cfg = await bot.stores.ticketConfigs.get(msg.guild.id);
-		if(!cfg) return "Please run `ha!ticket config` before doing this";
+		if(!cfg) return "Please run `ha!ticket config setup` before doing this";
 
 		var channel = msg.channelMentions.length > 0 ?
 				   msg.guild.channels.find(ch => ch.id == msg.channelMentions[0]) :
@@ -106,14 +106,14 @@ module.exports.subcommands.config = {
 		await msg.channel.createMessage("Enter the category that tickets should be created in. This can be the category name or ID. You have 1 minute to do this\nNOTE: This category's permissions should only allow mods and I to see channels; I handle individual permissions for users!"+(category ? "\nType `skip` to keep the current value" : ""));
 		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
 		if(!resp[0]) return "Action cancelled: timed out";
-		if(!(category && resp[0].content.toLowerCase() == "skip")) category = await msg.guild.channels.find(c => (c.id == resp[0].content || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 4);
+		if(!(category && resp[0].content.toLowerCase() == "skip")) category = await msg.guild.channels.find(c => (c.id == resp[0].content.replace(/[<#>]/g,"") || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 4);
 		if(!category) return "Action cancelled: category not found";
 
 		await msg.channel.createMessage("Enter the channel that archived tickets should be sent to. This can be the channel name, #mention, or ID. You have 1 minute to do this\nNOTE: This is not required. Type `skip` to skip it, and archives will be sent to your DMs instead");;
 		resp = await msg.channel.awaitMessages(m => m.author.id == msg.author.id,{time:1000*60,maxMatches:1});
 		if(!resp[0]) return "Action cancelled: timed out";
-		if(resp[0].content.toLowerCase() != "skip") archives = await msg.guild.channels.find(c => (c.id == resp[0].content.replace(/<#>/g,"") || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 0);
-		if(!archives && resp[0].toLowerCase() != "skip") return "Action cancelled: category not found";
+		if(resp[0].content.toLowerCase() != "skip") archives = await msg.guild.channels.find(c => (c.id == resp[0].content.replace(/[<#>]/g,"") || c.name.toLowerCase() == resp[0].content.toLowerCase()) && c.type == 0);
+		if(!archives && resp[0].content.toLowerCase() != "skip") return "Action cancelled: category not found";
 
 		try {
 			if(cfg.category_id == "") await bot.stores.ticketConfigs.create(msg.guild.id, {category_id: category.id, archives_id: archives.id});
