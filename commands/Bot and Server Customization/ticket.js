@@ -21,7 +21,7 @@ module.exports = {
 				fields: [
 					{name: "First message", value: `[clicky!](https://discordapp.com/channels/${msg.guild.id}/${t.channel_id}/${t.first_message})`},
 					{name: "Ticket opener", value: `${t.opener.mention} (${t.opener.username}#${t.opener.discriminator})`},
-					{name: "Ticket users", value: `${[t.opener].concat(t.users).map(u => `${u.mention} (${u.username}#${u.discriminator})`)}`}
+					{name: "Ticket users", value: `${[t.opener].concat(t.users).map(u => `${u.mention} (${u.username}#${u.discriminator})`).join("\n")}`}
 				],
 				timestamp: t.timestamp
 			}}
@@ -311,10 +311,9 @@ module.exports.subcommands.remove = {
 		var channel = msg.guild.channels.find(c => c.id == ticket.channel_id);
 		if(!channel) return "Couldn't get the channel associated with that ticket";
 
-		ids = ids.filter(id => ticket.user_ids.includes(id) && id != ticket.opener_id);
+		ticket.user_ids = ticket.user_ids.filter(id => !ids.includes(id));
 
-		var members = msg.guild.members.filter(m => ids.includes(m.id)).map(m => m.id);
-		if(!members || !members[0]) return "Please provide valid members to add to the ticket";
+		var members = msg.guild.members.filter(m => ticket.user_ids.includes(m.id)).map(m => m.id);
 
 		try {
 			for(var m of members) {

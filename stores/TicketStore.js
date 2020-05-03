@@ -273,7 +273,7 @@ class TicketStore extends Collection {
 				return rej(e.message || e);
 			}
 			
-			res(await this.get(server, hid, true));
+			res(ticket);
 		})
 	}
 
