@@ -13,8 +13,8 @@ module.exports = {
 		var embeds = [];
 		if(args[0]) {
 			var category = await bot.stores.reactCategories.get(msg.guild.id, args[0].toLowerCase());
-			if(!category) return msg.channel.createMessage("Category not found");
-			if(!category.roles || !category.roles[0]) return msg.channel.createMessage("That category has no roles indexed");
+			if(!category) return "Category not found";
+			if(!category.roles || !category.roles[0]) return "That category has no roles indexed";
 
 			embeds = await bot.utils.genEmbeds(bot, category.roles, rl => {
 				return {name: `${rl.raw.name} (${rl.emoji.includes(":") ? `<${rl.emoji}>` : rl.emoji})`, value: `Description: ${rl.description || "*(no description provided)*"}\nPreview: ${rl.raw.mention}`}
@@ -174,7 +174,7 @@ module.exports.subcommands.add = {
 				"The category has been updated- however, because the amount of roles is greater than "+
 				"the amount that the current number of pages can handle, the posts have not been updated.\n"+
 				"If you would like for all the roles to be visible, **delete the current posts** and use "+
-				"`ha!rc post "+category.hid+" (channel)` to post them again." :
+				"`hub!rc post "+category.hid+" (channel)` to post them again." :
 				"",
 			embed: {
 				title: "Results",
@@ -227,7 +227,7 @@ module.exports.subcommands.remove = {
 				"The category has been updated- however, because the amount of roles is greater than "+
 				"the amount that the current number of pages can handle, the posts have not been updated.\n"+
 				"If you would like for all the roles to be visible, **delete the current posts** and use "+
-				"`ha!rc post "+category.hid+" (channel)` to post them again." :
+				"`hub!rc post "+category.hid+" (channel)` to post them again." :
 				"",
 			embed: {
 				title: "Results",

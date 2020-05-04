@@ -112,6 +112,47 @@ module.exports.subcommands.bind = {
 	guildOnly: true
 }
 
+module.exports.subcommands.unbind = {
+	help: ()=> "Uninds a reaction role from a certain message",
+	usage: ()=> [" [role name] [channel] [messageID] - Unbinds a role from the message"],
+	execute: async (bot, msg, args) => {
+		if(!args[2]) return "This command requires at least 3 arguments";
+		var rl = args.slice(0, args.length - 2).join(" ").replace(/[<@&>]/g,"").toLowerCase();
+		var role = msg.guild.roles.find(r => r.id == rl || r.name.toLowerCase() == rl);
+		if(!role) return "Role not found";
+		role = await bot.stores.reactRoles.get(msg.guild.id, role.id);
+		if(!role) return "Reaction role not found";
+
+		var channel = msg.guild.channels.find(ch => ch.id == args[args.length - 2].replace(/[<#>]/g,"") || ch.name == args[args.length - 2].toLowerCase());
+		if(!channel) return "Channel not found";
+		var message = await bot.getMessage(channel.id, args[args.length-1]);
+		if(!message) return "Invalid message";
+
+		var post = await bot.stores.reactPosts.get(message.guild.id, message.id);
+		try {
+			if(post) {
+				if(post.roles.find(r => r.role_id == role.role_id)) {
+					post.raw_roles = post.raw_roles.filter(x => x != role.id);
+					await bot.stores.reactPosts.update(msg.guild.id, post.message_id, {roles: post.raw_roles});
+					
+				} else {
+					return "That role isn't bound to that message";
+				}
+			} else {
+				return "Nothing is bound to that post";
+			}
+
+			await message.removeReaction(role.emoji.replace(/^\:/, ""));
+		} catch(e) {
+			return "ERR: "+e;
+		}
+
+		return "React role unbound!";
+	},
+	permissions: ["manageRoles"],
+	guildOnly: true
+}
+
 module.exports.subcommands.emoji = {
 	help: ()=> "Changes emoji for a role",
 	usage: ()=> " [role] [emoji] - Changes emoji for the given role",
