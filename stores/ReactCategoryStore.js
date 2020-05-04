@@ -127,6 +127,7 @@ class ReactCategoryStore extends Collection {
 			}
 			
 			var category = await this.get(server, hid, true);
+			if(!category) return rej('Category not found');
 
 			var embeds = await this.bot.utils.genReactPosts(this.bot, category.roles, {
 				title: category.name,
