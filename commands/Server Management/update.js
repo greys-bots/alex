@@ -31,7 +31,7 @@ module.exports.subcommands.all = {
 	help: ()=> "Attempts to update all listed servers",
 	usage: ()=> [" - Tries to do the updating thing"],
 	execute: async (bot, msg, args) => {
-		var servers = await bot.utils.getServers(bot, msg.guild.id);
+		var servers = await bot.stores.servers.getAll(msg.guild.id);
 		if(!servers || !servers[0]) return "You don't have any servers registered";
 
 		var failed = [];
