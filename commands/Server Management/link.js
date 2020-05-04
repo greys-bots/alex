@@ -16,7 +16,7 @@ module.exports = {
 		
 		return 'Link updated!';
 	},
-	alias: ['link'],
+	alias: ['invite'],
 	permissions: ["manageMessages"],
 	guildOnly: true
 }

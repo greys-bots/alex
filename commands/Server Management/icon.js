@@ -11,7 +11,7 @@ module.exports = {
 		else return `Current icon: ${server.pic_url}`;
 
 		try {
-			var guild = await bot.stores.servers.update(msg.guild.id, args[0], {pic_url: args[1] });
+			var guild = await bot.stores.servers.update(msg.guild.id, args[0], {pic_url: url});
 			await bot.stores.serverPosts.updateByHostedServer(msg.guild.id, args[0], guild);
 		} catch(e) {
 			return "ERR: "+e;
