@@ -260,7 +260,6 @@ class ServerPostStore extends Collection {
 			//no database updates needed! yay!
 			try {
 				var post = await this.get(host, message);
-				console.log(post);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);

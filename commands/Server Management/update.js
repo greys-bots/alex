@@ -50,7 +50,7 @@ module.exports.subcommands.all = {
 					continue;
 				}
 			} else if(servers[i].invite) {
-				if(!(servers[i].invite.contains("discord.gg") || servers[i].invite.contains("discordapp.com"))) continue;
+				if(!(servers[i].invite.includes("discord.gg") || servers[i].invite.includes("discordapp.com"))) continue;
 				let id = servers[i].invite.match(/(?:.*)+\/(.*)$/) ?
 						 servers[i].invite.match(/(?:.*)+\/(.*)$/)[1] :
 						 "";
