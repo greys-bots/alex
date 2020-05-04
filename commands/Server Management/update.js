@@ -3,7 +3,9 @@ module.exports = {
 	usage: ()=> [" [invite] - Updates the server that the invite belongs to (NOTE: use a new invite to replace the existing one",
 				 " all - Attempts to update all servers"],
 	execute: async (bot, msg, args) => {
-		var id = args[0].match(/(?:.*)+\/(.*)$/)[1] || args[0];
+		if(!args) return "Please provide an invite for the server you want to update";
+		var match = args[0].match(/(?:.*)+\/(.*)$/);
+		var id = match ? match[1] : args[0];
 
 		try {
 			var invite = await bot.getInvite(id);
@@ -47,10 +49,8 @@ module.exports.subcommands.all = {
 					failed.push({name: servers[i].name, value: `Couldn't update server (${e.message})`});
 					continue;
 				}
-			} else if(servers[i].invite && 
-				(servers[i].invite.contains("discord.gg") ||
-				servers[i].invite.contains("discordapp.com"))
-			) {
+			} else if(servers[i].invite) {
+				if(!(servers[i].invite.contains("discord.gg") || servers[i].invite.contains("discordapp.com"))) continue;
 				let id = servers[i].invite.match(/(?:.*)+\/(.*)$/) ?
 						 servers[i].invite.match(/(?:.*)+\/(.*)$/)[1] :
 						 "";
