@@ -148,7 +148,7 @@ class ReactRoleStore extends Collection {
 				}
 				for(var i = 0; i < data.rows.length; i++) {
 					data.rows[i].raw = guild.roles.find(r => r.id == data.rows[i].role_id);
-					if(!data.rows[0].raw) {
+					if(!data.rows[i].raw) {
 						await this.delete(server, data.rows[i].role_id);
 						data.rows[i] = undefined;
 					}
@@ -179,7 +179,7 @@ class ReactRoleStore extends Collection {
 				}
 				for(var i = 0; i < data.rows.length; i++) {
 					data.rows[i].raw = guild.roles.find(r => r.id == data.rows[i].role_id);
-					if(!data.rows[0].raw) {
+					if(!data.rows[i].raw) {
 						await this.delete(server, data.rows[i].role_id);
 						data.rows[i] = undefined;
 					}
