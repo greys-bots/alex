@@ -326,10 +326,10 @@ class ReactPostStore extends Collection {
 		})
 	}
 
-	async handleReactions(msg, emoji, user, store) {
+	async handleReactions(msg, emoji, user) {
 		return new Promise(async (res, rej) => {
 			if(this.bot.user.id == user) return;
-			var post = await store.get(msg.channel.guild.id, msg.id);
+			var post = await this.get(msg.channel.guild.id, msg.id);
 			if(!post) return;
 			if(emoji.id) emoji.name = `:${emoji.name}:${emoji.id}`;
 			var role = post.roles.find(r => [emoji.name, `a${emoji.name}`].includes(r.emoji));
@@ -342,10 +342,10 @@ class ReactPostStore extends Collection {
 			try {
 				if(member.roles.includes(role.id)) msg.channel.guild.removeMemberRole(user, role.id);
 				else msg.channel.guild.addMemberRole(user, role.id);
-				store.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name.replace(/^:/,""), user);
+				this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name.replace(/^:/,""), user);
 			} catch(e) {
 				console.log(e);
-				var ch = await store.bot.getDMChannel(user);
+				var ch = await this.bot.getDMChannel(user);
 				if(!ch) rej(e.message); //can't deliver error? reject
 				if(e.stack.includes("addGuildMemberRole") || e.stack.includes("removeGuildMemberRole")) ch.createMessage(`Couldn't manage role **${rl.name}** in ${msg.channel.guild.name}. Please let a mod know that something went wrong`);
 				else ch.createMessage(`Couldn't remove your reaction in ${msg.channel.guild.name}. Please let a mod know something went wrong`);
