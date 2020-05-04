@@ -89,7 +89,7 @@ module.exports.subcommands.reprole = {
 
 		var cfg = await bot.stores.configs.get(msg.guild.id);
 
-		var role = msg.guild.roles.find(rl => rl.id == args[0].replace(/[<&>]/g,"") || rl.name.toLowerCase() == args.join(" ").toLowerCase());
+		var role = msg.guild.roles.find(rl => rl.id == args[0].replace(/[<@&>]/g,"") || rl.name.toLowerCase() == args.join(" ").toLowerCase());
 		if(!role) return "Role not found";
 
 		try {

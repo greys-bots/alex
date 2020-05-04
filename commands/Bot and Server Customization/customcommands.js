@@ -72,13 +72,13 @@ module.exports.subcommands.add = {
 					case "rr":
 						await msg.channel.createMessage("Type the name of the role you want to remove.")
 						response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
-						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return "ERR: Role not found. Aborting";
+						if(!msg.guild.roles.find(r => r.id == response.replace(/[<@&>]/g, "") || r.name.toLowerCase() == response) return "ERR: Role not found. Aborting";
 						actions.push({type: "rr", action: `${target}.rr(rf('${response}'))`})
 						break;
 					case "ar":
 						await msg.channel.createMessage("Type the name of the role you want to add.")
 						response = (await msg.channel.awaitMessages(m => m.author.id == msg.author.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
-						if(!msg.guild.roles.find(r => r.name.toLowerCase() == response)) return "ERR: Role not found. Aborting";
+						if(!msg.guild.roles.find(r => r.id == response.replace(/[<@&>]/g, "") || r.name.toLowerCase() == response) return "ERR: Role not found. Aborting";
 						actions.push({type: "rr", action:`${target}.ar(rf('${response}'))`})
 						break;
 					case "bl":
