@@ -31,8 +31,8 @@ module.exports.subcommands.add = {
 	usage: ()=> [" [role] [emoji] (new line) <description> - Creates a new reaction role config (NOTE: if emoji is custom, must be in the same server as the bot)"],
 	execute: async (bot, msg, args)=> {
 		var nargs = args.join(" ").split("\n");
-		var arg1 = nargs[0].replace(/\s+$/g,"").split(" ");
-		var role = msg.guild.roles.find(r => r.id == arg1.slice(0, arg1.length-1).replace(/[<@&>]/g, "") || r.name.toLowerCase() == arg1.slice(0, arg1.length-1).join(" ").toLowerCase());
+		var arg1 = nargs[0].replace(/\s+$/,"").split(" ");
+		var role = msg.guild.roles.find(r => r.id == arg1.slice(0, arg1.length-1).join(" ").replace(/[<@&>]/g, "") || r.name.toLowerCase() == arg1.slice(0, arg1.length-1).join(" ").toLowerCase());
 		if(!role) return "Role not found";
 		var emoji = arg1.slice(-1)[0].replace(/[<>\s]/g,"");
 		var description = nargs.slice(1).join("\n");
