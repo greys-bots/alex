@@ -1,6 +1,6 @@
 module.exports = {
 	help: ()=> "Updates a server's info using an invite",
-	usage: ()=> [" [invite] - Updates the server that the invite belongs to (NOTE: use a new invite to replace the existing one",
+	usage: ()=> [" [invite] - Updates the server that the invite belongs to (NOTE: if you want to update the invite as well, just provide a new one)",
 				 " all - Attempts to update all servers"],
 	execute: async (bot, msg, args) => {
 		if(!args) return "Please provide an invite for the server you want to update";
