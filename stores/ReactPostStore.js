@@ -278,8 +278,8 @@ class ReactPostStore extends Collection {
 					}
 				} else if(!data.embed && post.page > 0) {
 					try {
-						await this.bot.deleteMessage(post.channel_id, post.message_id);
 						await this.delete(server, message);
+						await this.bot.deleteMessage(post.channel_id, post.message_id);
 					} catch(e) {
 						return rej(e.message || e);
 					}
@@ -306,8 +306,7 @@ class ReactPostStore extends Collection {
 			}
 			
 			var post = await this.get(server, message, true);
-
-			
+			if(!post.roles || !post.roles[0]) await this.delete(server, message);
 			
 			res(post);
 		})
@@ -332,7 +331,8 @@ class ReactPostStore extends Collection {
 			if(this.bot.user.id == user) return;
 			var post = await store.get(msg.channel.guild.id, msg.id);
 			if(!post) return;
-			var role = post.roles.find(r => [emoji.name, "a"+emoji.name].includes(r.emoji));
+			if(emoji.id) emoji.name = `:${emoji.name}:${emoji.id}`;
+			var role = post.roles.find(r => [emoji.name, `a${emoji.name}`].includes(r.emoji));
 			if(!role) return;
 			role = msg.channel.guild.roles.find(r => r.id == role.role_id);
 			if(!role) return;
