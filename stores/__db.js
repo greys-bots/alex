@@ -92,7 +92,9 @@ module.exports = async (bot) => {
 	    	name 			TEXT,
 	    	description 	TEXT,
 	    	roles 			TEXT[],
-	    	posts 			TEXT[]
+	    	posts 			TEXT[],
+	    	single 			BOOLEAN,
+	    	required 		TEXT
 	    );
 
 	    CREATE TABLE IF NOT EXISTS reactroles (
@@ -108,8 +110,11 @@ module.exports = async (bot) => {
 			server_id		TEXT,
 			channel_id		TEXT,
 			message_id		TEXT,
+			category 		TEXT,
 			roles			TEXT[],
-			page 			INTEGER
+			page 			INTEGER,
+	    	single 			BOOLEAN,
+	    	required 		TEXT
 		);
 
 		CREATE TABLE IF NOT EXISTS receipts (
@@ -201,7 +206,7 @@ module.exports = async (bot) => {
 	bot.stores = {};
 	var files = fs.readdirSync(__dirname);
 	for(var file of files) {
-		if(["__db.js", "__migrations.js"].includes(file)) continue;
+		if(["__db.js", "__migrations.js", "tmp.js"].includes(file)) continue;
 		var tmpname = file.replace(/store\.js/i, "");
 		var name =  tmpname[0].toLowerCase() + 
 				   (tmpname.endsWith("y") ?

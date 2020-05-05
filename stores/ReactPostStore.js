@@ -41,9 +41,11 @@ class ReactPostStore extends Collection {
 					channel_id,
 					message_id,
 					roles,
-					page
-				) VALUES ($1,$2,$3,$4,$5)`,
-				[server, channel, message, data.roles || [], data.page || 0]);
+					page,
+					single,
+					required
+				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				[server, channel, message, data.roles || [], data.page || 0, data.single, data.required]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -61,9 +63,11 @@ class ReactPostStore extends Collection {
 					channel_id,
 					message_id,
 					roles,
-					page
-				) VALUES ($1,$2,$3,$4,$5)`,
-				[server, channel, message, data.roles || [], data.page || 0]);
+					page,
+					single,
+					required
+				) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				[server, channel, message, data.roles || [], data.page || 0, data.single, data.required]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -248,8 +252,11 @@ class ReactPostStore extends Collection {
 
 	async update(server, message, data = {}) {
 		return new Promise(async (res, rej) => {
+			console.log(data);
 			try {
-				if(data.roles) await this.db.query(`UPDATE reactposts SET roles = $1 WHERE server_id = $2 AND message_id = $3`,[data.roles, server, message]);
+				if(data.roles || data.single || data.required)
+					await this.db.query(`UPDATE reactposts SET roles = $1, single = $2, required = $3 WHERE server_id = $4 AND message_id = $5`,
+						[data.roles, data.single, data.required, server, message]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -267,6 +274,7 @@ class ReactPostStore extends Collection {
 					data = data[0];
 				}
 
+				console.log(data);
 				if(data.embed) {
 					try {
 						await this.bot.editMessage(post.channel_id, post.message_id, {embed: data.embed});
@@ -334,15 +342,18 @@ class ReactPostStore extends Collection {
 			if(emoji.id) emoji.name = `:${emoji.name}:${emoji.id}`;
 			var role = post.roles.find(r => [emoji.name, `a${emoji.name}`].includes(r.emoji));
 			if(!role) return;
+			var roles = post.roles.map(r => msg.channel.guild.roles.find(x => x.id == r.role_id)).filter(x => x && x.id != role.role_id);
 			role = msg.channel.guild.roles.find(r => r.id == role.role_id);
 			if(!role) return;
 			var member = msg.channel.guild.members.find(m => m.id == user);
 			if(!member) return;
 
 			try {
+				this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name.replace(/^:/,""), user);
+				if(post.required && !member.roles.includes(post.required)) return;
 				if(member.roles.includes(role.id)) msg.channel.guild.removeMemberRole(user, role.id);
 				else msg.channel.guild.addMemberRole(user, role.id);
-				this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name.replace(/^:/,""), user);
+				if(post.single) roles.forEach(r => { if(member.roles.includes(r.id)) msg.channel.guild.removeMemberRole(user, r.id)})
 			} catch(e) {
 				console.log(e);
 				var ch = await this.bot.getDMChannel(user);

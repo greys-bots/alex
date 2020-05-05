@@ -70,7 +70,7 @@ module.exports = {
 						description: info.description,
 						fields: [],
 						footer: info.footer
-					}, emoji: []};
+					}, roles: [], emoji: []};
 					current.embed.fields.push({
 						name: `${roles[i].raw.name} (${roles[i].emoji.includes(":") ? `<${roles[i].emoji}>` : roles[i].emoji})`,
 						value: `Description: ${roles[i].description || "*(no description provided)*"}\nPreview: ${roles[i].raw.mention}`

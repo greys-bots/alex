@@ -17,10 +17,12 @@ class ReactCategoryStore extends Collection {
 					name,
 					description,
 					roles,
-					posts
-				) VALUES ($1,$2,$3,$4,$5,$6)`,
-				[hid, server, data.name || "", data.description || "",
-				data.roles || [], data.posts || []]);
+					posts,
+					single,
+					required
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				[hid, server, data.name, data.description,
+				data.roles || [], data.posts || [], data.single, data.required]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -39,10 +41,12 @@ class ReactCategoryStore extends Collection {
 					name,
 					description,
 					roles,
-					posts
-				) VALUES ($1,$2,$3,$4,$5,$6)`,
-				[hid, server, data.name || "", data.description || "",
-				data.roles || [], data.posts || []]);
+					posts,
+					single,
+					required
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				[hid, server, data.name, data.description,
+				data.roles || [], data.posts || [], data.single, data.required]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -69,7 +73,7 @@ class ReactCategoryStore extends Collection {
 			if(data.rows && data.rows[0]) {
 				var category = data.rows[0];
 				category.raw_posts = category.posts;
-				category.posts = await this.bot.stores.reactPosts.getByRowIDs(server, category.posts);
+				category.posts = (await this.bot.stores.reactPosts.getByRowIDs(server, category.posts)) || [];
 				category.raw_roles = category.roles;
 				category.roles = await this.bot.stores.reactRoles.getByRowIDs(server, category.roles);
 				if(category.raw_posts.length < category.posts.length || category.raw_roles.length < category.roles.length) {
@@ -133,14 +137,15 @@ class ReactCategoryStore extends Collection {
 				title: category.name,
 				description: category.description,
 				footer: {
-					text: "Category ID: "+category.hid
+					text: `Category ID: ${category.hid}${category.single ? " | You may only have one role from this category at a time" : ""}`
 				}
 			});
+			console.log(embeds);
 
 			if(updatePosts) {
 				for(var post of category.posts) {
 					try {
-						await this.bot.stores.reactPosts.update(server, post.message_id, embeds[post.page]);
+						await this.bot.stores.reactPosts.update(server, post.message_id, {...embeds[post.page], single: category.single, required: category.required});
 					} catch(e) {
 						return rej(e);
 					}

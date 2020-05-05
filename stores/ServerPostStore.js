@@ -26,48 +26,31 @@ class ServerPostStore extends Collection {
 
 		this.bot.on("guildCreate", async (guild) => {
 			return new Promise(async (res, rej) => {
-				await this.updateByServer(guild.id);
+				guild = await this.bot.stores.servers.getByID(guild.id);
+				await this.updateByServer(guild.server_id, guild);
 			})	
 		})
 
 		this.bot.on("guildUpdate", async (guild) => {
 			return new Promise(async (res, rej) => {
-				await this.bot.stores.servers.updateByID(guild.id, {name: guild.name, pic_url: guild.iconURL})
-				await this.updateByServer(guild.id, {name: guild.name, pic_url: guild.iconURL});
+				guild = await this.bot.stores.servers.updateByID(guild.id, {name: guild.name, pic_url: guild.iconURL})
+				await this.updateByServer(guild.server_id, guild);
 			})
 		})
 
 		this.bot.on("guildMemberAdd", async (guild, member) => {
 			return new Promise(async (res, rej) => {
 				//update member count
-				await this.updateByServer(guild.id);
-				
-				//notify current guild if the user is banned from their synced server
-				var scfg = await this.bot.stores.syncConfigs.get(guild.id);
-				if(!scfg || (!scfg.sync_id && !scfg.confirmed) || !scfg.ban_notifs) return;
-				var log = await this.bot.stores.banLogs.getByUser(scfg.sync_id, member.id);
-				if(!log || log == "deleted") return;
-				try {
-					await bot.createMessage(scfg.ban_notifs, {embed: {
-						title: "Ban Notification",
-						description: [
-							`New member **${member.username}#${member.discriminator}** (${member.id})`,
-							` has been banned from your currently synced server.\n`,
-							`Reason:\n`,
-							log.embed.fields[2].value
-						].join(""),
-						color: parseInt("aa5555", 16)
-					}})
-				} catch(e) {
-					console.log(e);
-				}
+				guild = await this.bot.stores.servers.getByID(guild.id);
+				await this.updateByServer(guild.server_id, guild);
 			})
 		})
 
 		this.bot.on("guildMemberRemove", async (guild, member) => {
 			return new Promise(async (res, rej) => {
 				//update member count
-				await this.updateByServer(guild.id);
+				guild = await this.bot.stores.servers.getByID(guild.id);
+				await this.updateByServer(guild.server_id, guild);
 			});
 		})
 
