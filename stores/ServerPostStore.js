@@ -27,14 +27,14 @@ class ServerPostStore extends Collection {
 		this.bot.on("guildCreate", async (guild) => {
 			return new Promise(async (res, rej) => {
 				guild = await this.bot.stores.servers.getByID(guild.id);
-				await this.updateByServer(guild.server_id, guild);
+				if(guild) await this.updateByServer(guild.server_id, guild);
 			})	
 		})
 
 		this.bot.on("guildUpdate", async (guild) => {
 			return new Promise(async (res, rej) => {
 				guild = await this.bot.stores.servers.updateByID(guild.id, {name: guild.name, pic_url: guild.iconURL})
-				await this.updateByServer(guild.server_id, guild);
+				if(guild) await this.updateByServer(guild.server_id, guild);
 			})
 		})
 
@@ -42,7 +42,7 @@ class ServerPostStore extends Collection {
 			return new Promise(async (res, rej) => {
 				//update member count
 				guild = await this.bot.stores.servers.getByID(guild.id);
-				await this.updateByServer(guild.server_id, guild);
+				if(guild) await this.updateByServer(guild.server_id, guild);
 			})
 		})
 
@@ -50,7 +50,7 @@ class ServerPostStore extends Collection {
 			return new Promise(async (res, rej) => {
 				//update member count
 				guild = await this.bot.stores.servers.getByID(guild.id);
-				await this.updateByServer(guild.server_id, guild);
+				if(guild) await this.updateByServer(guild.server_id, guild);
 			});
 		})
 
