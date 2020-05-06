@@ -40,12 +40,13 @@ class ReactPostStore extends Collection {
 					server_id,
 					channel_id,
 					message_id,
+					category,
 					roles,
 					page,
 					single,
 					required
-				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-				[server, channel, message, data.roles || [], data.page || 0, data.single, data.required]);
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				[server, channel, message, data.category, data.roles || [], data.page || 0, data.single, data.required]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -62,12 +63,13 @@ class ReactPostStore extends Collection {
 					server_id,
 					channel_id,
 					message_id,
+					category,
 					roles,
 					page,
 					single,
 					required
-				) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-				[server, channel, message, data.roles || [], data.page || 0, data.single, data.required]);
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				[server, channel, message, data.category, data.roles || [], data.page || 0, data.single, data.required]);
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);

@@ -268,7 +268,7 @@ module.exports.subcommands.post = {
 		for(var i = 0; i < posts.length; i++) {
 			var message = await channel.createMessage({embed: posts[i].embed});
 			posts[i].emoji.forEach(r => message.addReaction(r));
-			var post = await bot.stores.reactPosts.create(msg.guild.id, channel.id, message.id, {...posts[i], page: i, single: category.single, required: category.required});
+			var post = await bot.stores.reactPosts.create(msg.guild.id, channel.id, message.id, {...posts[i], page: i, category: category.hid, single: category.single, required: category.required});
 			category.raw_posts.push(post.id);
 		}
 
