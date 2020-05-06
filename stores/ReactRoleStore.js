@@ -172,7 +172,6 @@ class ReactRoleStore extends Collection {
 			
 			if(data.rows && data.rows[0]) {
 				try {
-					// var guild = await this.bot.getRESTGuild(server);
 					var guild = this.bot.guilds.find(g => g.id == server);
 				} catch(e) {
 					console.log(e);

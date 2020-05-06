@@ -140,7 +140,9 @@ class ReactCategoryStore extends Collection {
 					text: `Category ID: ${category.hid}${category.single ? " | You may only have one role from this category at a time" : ""}`
 				}
 			});
+
 			console.log(embeds);
+			console.log("---")
 
 			if(updatePosts) {
 				for(var post of category.posts) {

@@ -263,6 +263,7 @@ class ReactPostStore extends Collection {
 			}
 			
 			var post = await this.get(server, message, true);
+			console.log(post);
 
 			if(post.message && post.message.embeds[0] && post.message.author.id == this.bot.user.id) { //react post from us
 				if(!data.embed && data.roles) { //regen roles
@@ -348,12 +349,14 @@ class ReactPostStore extends Collection {
 			var member = msg.channel.guild.members.find(m => m.id == user);
 			if(!member) return;
 
+			if(post.category) var category = await this.bot.stores.reactCategories.get(msg.channel.guild.id, post.category);
+
 			try {
 				this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name.replace(/^:/,""), user);
 				if(post.required && !member.roles.includes(post.required)) return;
 				if(member.roles.includes(role.id)) msg.channel.guild.removeMemberRole(user, role.id);
 				else msg.channel.guild.addMemberRole(user, role.id);
-				if(post.single) roles.forEach(r => { if(member.roles.includes(r.id)) msg.channel.guild.removeMemberRole(user, r.id)})
+				if(category && category.single) category.roles.forEach(r => { if(member.roles.includes(r.role_id)) msg.channel.guild.removeMemberRole(user, r.role_id)})
 			} catch(e) {
 				console.log(e);
 				var ch = await this.bot.getDMChannel(user);

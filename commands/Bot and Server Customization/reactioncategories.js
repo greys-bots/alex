@@ -86,7 +86,7 @@ module.exports.subcommands.delete = {
 	help: ()=> "Deletes a category",
 	usage: ()=> [" [id] - Deletes a reaction category"],
 	execute: async (bot, msg, args) => {
-		var category = bot.stores.reactCategories.get(msg.guild.id, args[0]);
+		var category = await bot.stores.reactCategories.get(msg.guild.id, args[0]);
 		if(!category) return 'Category does not exist';
 
 		await bot.stores.reactCategories.delete(msg.guild.id, args[0]);
@@ -100,7 +100,7 @@ module.exports.subcommands.name = {
 	help: ()=> "Changes name for a category",
 	usage: ()=> [" [ID] [name] - Changes name for the given category"],
 	execute: async (bot, msg, args)=> {
-		var category = bot.stores.reactCategories.get(msg.guild.id, args[0].toLowerCase());
+		var category = await bot.stores.reactCategories.get(msg.guild.id, args[0].toLowerCase());
 		if(!category) return 'Category does not exist';
 
 		try {
@@ -120,7 +120,7 @@ module.exports.subcommands.description = {
 	help: ()=> "Changes description for a category",
 	usage: ()=> [" [ID] [description] - Changes description for the given category"],
 	execute: async (bot, msg, args)=> {
-		var category = bot.stores.reactCategories.get(msg.guild.id, args[0]);
+		var category = await bot.stores.reactCategories.get(msg.guild.id, args[0].toLowerCase());
 		if(!category) return 'Category does not exist';
 
 		try {
@@ -261,14 +261,14 @@ module.exports.subcommands.post = {
 			title: category.name,
 			description: category.description,
 			footer: {
-				text: "Category ID: "+category.hid
+				text: `Category ID: ${category.hid}${category.single ? " | You may only have one role from this category at a time" : ""}`
 			}
 		});
 
 		for(var i = 0; i < posts.length; i++) {
 			var message = await channel.createMessage({embed: posts[i].embed});
 			posts[i].emoji.forEach(r => message.addReaction(r));
-			var post = await bot.stores.reactPosts.create(msg.guild.id, channel.id, message.id, {...posts[i], single: category.single, required: category.required});
+			var post = await bot.stores.reactPosts.create(msg.guild.id, channel.id, message.id, {...posts[i], page: i, single: category.single, required: category.required});
 			category.raw_posts.push(post.id);
 		}
 
