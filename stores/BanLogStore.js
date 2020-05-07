@@ -45,8 +45,8 @@ class BanLogStore extends Collection {
 					reason,
 					timestamp
 				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-				[hid, server, data.channel_id || "", data.message_id || "", data.users || [],
-				 data.reason || "", data.timestamp || new Date().toISOString()])
+				[hid, server, data.channel_id, data.message_id, data.users || [],
+				 data.reason, data.timestamp || new Date().toISOString()])
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -68,8 +68,8 @@ class BanLogStore extends Collection {
 					reason,
 					timestamp
 				) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-				[hid, server, data.channel_id || "", data.message_id || "", data.users || [],
-				 data.reason || "", data.timestamp || new Date().toISOString()])
+				[hid, server, data.channel_id, data.message_id, data.users || [],
+				 data.reason, data.timestamp || new Date().toISOString()])
 			} catch(e) {
 				console.log(e);
 		 		return rej(e.message);
@@ -83,7 +83,10 @@ class BanLogStore extends Collection {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
 				var log = super.get(`${server}-${hid}`);
-				if(log) return res(log);
+				if(log) {
+					log.receipt = await this.bot.stores.receipts.get(server, hid);
+					return res(log);
+				}
 			}
 
 			try {
