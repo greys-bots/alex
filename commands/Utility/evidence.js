@@ -39,7 +39,7 @@ module.exports.subcommands.add = {
 		if(log.receipt) return "Receipt already registered for that ban; use `ha!receipt edit` to edit it";
 
 		try {
-			await bot.stores.receipts.create(msg.guild.id, args[0].toLowerCase(), args.slice(1).join(" "));
+			await bot.stores.receipts.create(msg.guild.id, args[0].toLowerCase(), {message: args.slice(1).join(" ")});
 		} catch(e) {
 			return "ERR: "+e;
 		}

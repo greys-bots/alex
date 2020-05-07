@@ -87,13 +87,7 @@ class BanLogStore extends Collection {
 			}
 
 			try {
-				var data = await this.db.query(`
-					SELECT ban_logs.*,
-					(SELECT row_to_json(
-						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
-					FROM ban_logs WHERE server_id = $1 AND hid = $2
-				`, [server, hid]);
+				var data = await this.db.query(`SELECT * FROM ban_logs WHERE server_id = $1 AND hid = $2`, [server, hid]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -101,14 +95,17 @@ class BanLogStore extends Collection {
 
 			if(data.rows && data.rows[0]) {
 				var message;
+				var receipt;
 				try {
 					message = await this.bot.getMessage(data.rows[0].channel_id, data.rows[0].message_id);
+					receipt = await this.bot.stores.receipts.get(server, data.rows[0].hid);
 				} catch(e) {
 					console.log(e);
 				}
 
 				if(message) data.rows[0].embed = message.embeds[0];
-				else await this.delete(server, hid);
+				else await this.delete(server, data.rows[0].hid);
+				data.rows[0].receipt = receipt;
 
 				this.set(`${server}-${hid}`, data.rows[0]);
 				res(data.rows[0])
@@ -119,13 +116,7 @@ class BanLogStore extends Collection {
 	async getByMessage(server, channel, message) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`
-					SELECT ban_logs.*,
-					(SELECT row_to_json(
-						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
-					FROM ban_logs WHERE server_id = $1 AND channel_id = $2 AND message_id = $3
-				`, [server, channel, message]);
+				var data = await this.db.query(`SELECT * FROM ban_logs WHERE server_id = $1 AND channel_id = $2 AND message_id = $3`, [server, channel, message]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -133,14 +124,17 @@ class BanLogStore extends Collection {
 
 			if(data.rows && data.rows[0]) {
 				var msg;
+				var receipt;
 				try {
 					msg = await this.bot.getMessage(data.rows[0].channel_id, data.rows[0].message_id);
+					receipt = await this.bot.stores.receipts.get(server, data.rows[0].hid);
 				} catch(e) {
 					console.log(e);
 				}
 
 				if(msg) data.rows[0].embed = msg.embeds[0];
 				else await this.delete(server, data.rows[0].hid);
+				data.rows[0].receipt = receipt;
 
 				res(data.rows[0])
 			} else res(undefined)
@@ -150,13 +144,7 @@ class BanLogStore extends Collection {
 	async getAll(server) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`
-					SELECT ban_logs.*,
-					(SELECT row_to_json(
-						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
-					FROM ban_logs WHERE server_id = $1
-				`, [server]);
+				var data = await this.db.query(`SELECT * FROM ban_logs WHERE server_id = $1`, [server]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -166,9 +154,10 @@ class BanLogStore extends Collection {
 				var logs = [];
 				for(var i = 0; i < data.rows.length; i++) {
 					var message;
-
+					var receipt;
 					try {
 						message = await this.bot.getMessage(data.rows[i].channel_id, data.rows[i].message_id);
+						receipt = await this.bot.stores.receipts.get(server, data.rows[i].hid);
 					} catch(e) {
 						console.log(e.stack);
 						await this.delete(server, data.rows[i].hid);
@@ -176,6 +165,7 @@ class BanLogStore extends Collection {
 					}
 
 					data.rows[i].embed = message.embeds[0];
+					data.rows[i].receipt = receipt;
 					logs.push(data.rows[i]);
 				}
 
@@ -187,13 +177,7 @@ class BanLogStore extends Collection {
 	async getByUser(server, user) {
 		return new Promise(async (res, rej) => {
 			try {
-				var data = await this.db.query(`
-					SELECT ban_logs.*,
-					(SELECT row_to_json(
-						(SELECT a FROM (SELECT receipts.*) a)
-					) FROM receipts WHERE server_id = ban_logs.server_id AND hid = ban_logs.hid) AS receipt
-					FROM ban_logs WHERE server_id = $1 AND $2=ANY(users)
-				`, [server, user]);
+				var data = await this.db.query(`SELECT * FROM ban_logs WHERE server_id = $1 AND $2=ANY(users)`, [server, user]);
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
@@ -203,9 +187,10 @@ class BanLogStore extends Collection {
 				var logs = [];
 				for(var i = 0; i < data.rows.length; i++) {
 					var message;
-
+					var receipt;
 					try {
 						message = await this.bot.getMessage(data.rows[i].channel_id, data.rows[i].message_id);
+						receipt = await this.bot.stores.receipts.get(server, data.rows[i].hid);
 					} catch(e) {
 						console.log(e.stack);
 						await this.delete(server, data.rows[i].hid);
@@ -213,6 +198,7 @@ class BanLogStore extends Collection {
 					}
 
 					data.rows[i].embed = message.embeds[0];
+					data.rows[i].receipt = receipt;
 					logs.push(data.rows[i]);
 				}
 
@@ -315,7 +301,6 @@ class BanLogStore extends Collection {
 	async scrub(server, user) {
 		return new Promise(async (res, rej) => {
 			var logs = await this.getByUser(server, user);
-			console.log(logs);
 			if(!logs || !logs[0]) return res(true);
 
 			for(var i = 0; i < logs.length; i++) {
@@ -353,9 +338,7 @@ class BanLogStore extends Collection {
 			
 			if(!["❓","❔"].includes(emoji.name)) return;
 			var log = await this.getByMessage(msg.channel.guild.id, msg.channel.id, msg.id);
-			console.log(log);
 			if(!log) return res();
-			console.log(log);
 
 			try {
 				await msg.removeReaction(emoji.name, user);
