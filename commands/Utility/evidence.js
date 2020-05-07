@@ -36,7 +36,7 @@ module.exports.subcommands.add = {
 
 		var log = await bot.stores.banLogs.get(msg.guild.id, args[0].toLowerCase());
 		if(!log || log == "deleted") return "Log does not exist";
-		if(log.receipt) return "Receipt already registered for that ban; use `ha!receipt edit` to edit it";
+		if(log.receipt) return "Receipt already registered for that ban; use `hub!receipt edit` to edit it";
 
 		try {
 			await bot.stores.receipts.create(msg.guild.id, args[0].toLowerCase(), {message: args.slice(1).join(" ")});
@@ -82,10 +82,10 @@ module.exports.subcommands.edit = {
 
 		var log = await bot.stores.banLogs.get(msg.guild.id, args[0].toLowerCase());
 		if(!log || log == "deleted") return "Log does not exist";
-		if(!log.receipt) return "No receipts registered for that ban; use `ha!receipt add` to add one";
+		if(!log.receipt) return "No receipts registered for that ban; use `hub!receipt add` to add one";
 
-		if(receipt.link) {
-			var links = await bot.stores.receipts.getLinked(msg.guild.id, receipt.link);
+		if(log.receipt.link) {
+			var links = await bot.stores.receipts.getLinked(msg.guild.id, log.receipt.link);
 			try {
 				for(var r of links) {
 					await bot.stores.receipts.update(msg.guild.id, r.hid, {message: args.slice(1).join(" ")});
@@ -97,7 +97,7 @@ module.exports.subcommands.edit = {
 			return "Receipt edited, along with all linked receipts!";
 		} else {
 			try {
-				await bot.stores.receipts.update(receipt.hid, msg.guild.id, {message: args.slice(1).join(" ")});
+				await bot.stores.receipts.update(log.receipt.hid, msg.guild.id, {message: args.slice(1).join(" ")});
 			} catch(e) {
 				return "ERR: "+e;
 			}
@@ -122,8 +122,8 @@ module.exports.subcommands.link = {
 		if(!log || log == "deleted") return "ID 1 is not a valid log ID";
 		var log2 = await bot.stores.banLogs.get(msg.guild.id, args[1].toLowerCase());
 		if(!log2 || log2 == "deleted") return "ID 2 is not a valid log ID";
-		if(!log.receipt && !log2.receipt) return "No receipt found for either ban. Please use the `ha!receipt add` command to add a receipt first";
-		if(log.receipt.link && log2.receipt.link) return "Both receipts already have links! Please use the `ha!receipt unlink` command to unlink one first";
+		if(!log.receipt && !log2.receipt) return "No receipt found for either ban. Please use the `hub!receipt add` command to add a receipt first";
+		if(log.receipt.link && log2.receipt.link) return "Both receipts already have links! Please use the `hub!receipt unlink` command to unlink one first";
 
 		var oreceipt;
 
@@ -148,7 +148,7 @@ module.exports.subcommands.link = {
 			return "ERR: "+e;
 		}
 
-		return `Receipts linked! You can now use \`ha!receipt edit ${args[1]} [new receipt]\` to edit them simultaneously`;
+		return `Receipts linked! You can now use \`hub!receipt edit ${args[1]} [new receipt]\` to edit them simultaneously`;
 	},
 	permissions: ["manageMessages"],
 	guildOnly: true
