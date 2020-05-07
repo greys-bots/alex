@@ -83,7 +83,7 @@ class BanLogStore extends Collection {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
 				var log = super.get(`${server}-${hid}`);
-				if(log) return res(config);
+				if(log) return res(log);
 			}
 
 			try {
@@ -132,14 +132,14 @@ class BanLogStore extends Collection {
 			}
 
 			if(data.rows && data.rows[0]) {
-				var message;
+				var msg;
 				try {
-					message = await this.bot.getMessage(data.rows[0].channel_id, data.rows[0].message_id);
+					msg = await this.bot.getMessage(data.rows[0].channel_id, data.rows[0].message_id);
 				} catch(e) {
 					console.log(e);
 				}
 
-				if(message) data.rows[0].embed = message.embeds[0];
+				if(msg) data.rows[0].embed = msg.embeds[0];
 				else await this.delete(server, data.rows[0].hid);
 
 				res(data.rows[0])
@@ -338,22 +338,24 @@ class BanLogStore extends Collection {
 		})
 	}
 
-	async handleReactions(msg, emoji, user, store) {
+	async handleReactions(msg, emoji, user) {
 		return new Promise(async res => {
 			if(user == this.bot.user.id) return;
 			try {
-				msg = store.bot.getMessage(msg.channel.id, msg.id);
+				msg = await this.bot.getMessage(msg.channel.id, msg.id);
 			} catch(e) {
 				if(e.message.contains("Unknown Message")) return;
 				console.log(e);
 				return rej(e.message);
 			}
 
-			if(!msg.guild) return res();
+			if(!msg.channel.guild) return res();
 			
 			if(!["❓","❔"].includes(emoji.name)) return;
-			var log = await store.getByMessage(msg.channel.guild.id, msg.channel.id, msg.id);
+			var log = await this.getByMessage(msg.channel.guild.id, msg.channel.id, msg.id);
+			console.log(log);
 			if(!log) return res();
+			console.log(log);
 
 			try {
 				await msg.removeReaction(emoji.name, user);
@@ -362,18 +364,18 @@ class BanLogStore extends Collection {
 				//don't need to stop, technically
 			}
 
-			var ch = await store.bot.getDMChannel(user);
+			var ch = await this.bot.getDMChannel(user);
 			if(!ch) return rej("Couldn't get user DM channel");
 
 			try {
 				if(!log.receipt) return ch.createMessage("No receipt has been registered for that ban :(");
-				var users = await store.bot.utils.verifyUsers(bot, log.embed.fields[1].value.split("\n"));
+				var users = await this.bot.utils.verifyUsers(this.bot, log.embed.fields[1].value.split("\n"));
 				ch.createMessage({embed: {
 					title: "Ban Receipt",
 					description: log.receipt.message,
 					fields: [
 						{name: "Users Banned", value: users.info.map(u => `${u.username}#${u.discriminator} (${u.id})`).concat(users.fail.map(u => `${u} - Member deleted?`)).join("\n")},
-						{name: "Reason", value: log.reason}
+						{name: "Reason", value: log.reason || log.embed.fields[2].value || "(no reason provided)"}
 					]
 				}})	
 			} catch(e) {
