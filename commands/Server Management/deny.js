@@ -14,7 +14,7 @@ module.exports = {
 		})
 
 		if(conf) channel = msg.guild.channels.find(ch => ch.id == conf.delist_channel) || message.channel;
-		else channel = message.channel;
+		else channel = msg.channel;
 
 		var message;
 		var code = bot.utils.genCode(bot.chars);
