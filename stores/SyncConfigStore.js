@@ -14,16 +14,16 @@ class SyncConfigStore extends Collection {
 				//notify current guild if the user is banned from their synced server
 				var scfg = await this.get(guild.id);
 				if(!scfg || (!scfg.sync_id && !scfg.confirmed) || !scfg.ban_notifs) return;
-				var log = await this.bot.stores.banLogs.getByUser(scfg.sync_id, member.id);
-				if(!log || log == "deleted") return;
+				var logs = await this.bot.stores.banLogs.getByUser(scfg.sync_id, member.id);
+				if(!logs || !logs[0]) return res();
 				try {
-					await bot.createMessage(scfg.ban_notifs, {embed: {
+					await this.bot.createMessage(scfg.ban_notifs, {embed: {
 						title: "Ban Notification",
 						description: [
 							`New member **${member.username}#${member.discriminator}** (${member.id})`,
 							` has been banned from your currently synced server.\n`,
 							`Reason:\n`,
-							log.embed.fields[2].value
+							logs[0].embed.fields[2].value
 						].join(""),
 						color: parseInt("aa5555", 16)
 					}})
