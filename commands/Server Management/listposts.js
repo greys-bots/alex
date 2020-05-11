@@ -19,7 +19,7 @@ module.exports = {
 					value: `Message ID: ${dat.message_id} ([go to](https://discordapp.com/channels/${msg.guild.id}/${dat.channel_id}/${dat.message_id}))`
 				}
 			}, {
-				title: `Posts for server ${server.name} (${server.id})`,
+				title: `Posts for server ${server.name} (${server.server_id})`,
 			}, 10, {addition: ""});
 
 			embeds = embeds.concat(tmp);

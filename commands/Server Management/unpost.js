@@ -8,7 +8,7 @@ module.exports = {
 		if(!chan) return 'Channel not found!';
 
 		try {
-			var posts = await bot.stores.serverPosts.getInChannel(msg.guild.id, guild.id, chan.id);
+			var posts = await bot.stores.serverPosts.getInChannel(msg.guild.id, guild.server_id, chan.id);
 		} catch(e) {
 			return "ERR: "+e;
 		}

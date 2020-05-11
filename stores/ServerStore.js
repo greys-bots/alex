@@ -99,7 +99,7 @@ class ServerStore extends Collection {
 
 			if(data.rows && data.rows[0]) {
 				data.rows[0].guild = this.bot.guilds.find(g => g.id == data.rows[0].server_id);
-				data.rows[0].posts = await this.bot.stores.serverPosts.getByHostedServer(host, data.rows[0].id);
+				data.rows[0].posts = await this.bot.stores.serverPosts.getByHostedServer(host, data.rows[0].server_id);
 				this.set(`${host}-${server}`, data.rows[0])
 				res(data.rows[0])
 			} else res(undefined);
