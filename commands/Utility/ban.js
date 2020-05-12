@@ -196,7 +196,7 @@ module.exports.subcommands.edit = {
 	usage: ()=> [" [banID] [new message] - Edit the message on a ban"],
 	execute: async (bot, msg, args) => {
 		if(!args[1]) return "Please provide a ban ID and a reason";
-		var log = await bot.stores.banLogs.get(args[0].toLowerCase(), msg.guild.id);
+		var log = await bot.stores.banLogs.get(msg.guild.id, args[0].toLowerCase());
 		var reason = args.slice(1).join(" ");
 
 		if(!log) return "Log not found";
