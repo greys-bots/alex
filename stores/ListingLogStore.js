@@ -77,7 +77,7 @@ class ListingLogStore extends Collection {
 		return new Promise(async (res, rej) => {
 			if(!forceUpdate) {
 				var log = super.get(`${server}-${hid}`);
-				if(log) return res(config);
+				if(log) return res(log);
 			}
 
 			try {
@@ -184,7 +184,7 @@ class ListingLogStore extends Collection {
 			log.embed.fields[1].value = log.reason;
 
 			try {
-				await this.bot.editMessage(ban.channel_id, ban.message_id, {embed: log.embed})
+				await this.bot.editMessage(log.channel_id, log.message_id, {embed: log.embed})
 			} catch(e) {
 				console.log(e);
 				return rej(e.message);
