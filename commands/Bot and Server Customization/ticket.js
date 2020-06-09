@@ -168,8 +168,8 @@ module.exports.subcommands.archive = {
 				title: "Support Ticket Archive",
 				fields: [
 					{name: "Time opened", value: bot.formatTime(new Date(ticket.timestamp))},
-					{name: "Opener", value: `${ticket.opener.username}#${ticket.opener.discriminator} (${ticket.opener.id})`},
-					{name: "Users involved", value: ticket.users.map(u => `${u.username}#${u.discriminator} (${u.id})`).join("\n")},
+					{name: "Opener", value: `${ticket.opener.username}#${ticket.opener.discriminator} (<@${ticket.opener.id}>)`},
+					{name: "Users involved", value: [ticket.opener, ...ticket.users].map(u => `${u.username}#${u.discriminator} (<@${u.id}>)`).join("\n")},
 					{name: "Time closed", value: bot.formatTime(date)}
 				],
 				timestamp: date.toISOString(),
