@@ -246,7 +246,9 @@ class StarPostStore extends Collection {
 			var board = await this.bot.stores.starboards.getByEmoji(msg.guild.id, emoji);
 			if(!board) return res();
 			var cfg = await this.bot.stores.configs.get(msg.guild.id);
-			var tolerance = board.tolerance ? board.tolerance : cfg.starboard || 2;
+			var tolerance;
+			if(cfg) tolerance = cfg.starboard || 2;
+			if(board.tolerance) tolerance = board.tolerance;
 			var member = msg.guild.members.find(m => m.id == user);
 			if(!member) return rej("Member not found");
 
