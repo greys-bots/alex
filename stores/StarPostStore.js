@@ -280,7 +280,7 @@ class StarPostStore extends Collection {
 				var config = await this.bot.stores.configs.get(msg.channel.guild.id);
 				if(config && config.blacklist && config.blacklist.includes(user)) return;
 
-				var reaction = emoji.id ? `:${emoji.id}:${emoji.name}` : emoji.name;
+				var reaction = emoji.id ? `:${emoji.name}:${emoji.id}` : emoji.name;
 				var count = msg.reactions[reaction.replace(/^:/,"")] ? msg.reactions[reaction.replace(/^:/,"")].count : 0;
 				console.log(count);
 				if(count > 0) {
