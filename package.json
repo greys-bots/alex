@@ -8,7 +8,7 @@
     "discord.js": "^12.2.0",
     "dotenv": "^7.0.0",
     "eris": "github:abalabahaha/eris#dev",
-    "eris-additions": "^1.4.0",
+    "eris-additions": "^1.4.1",
     "mysql": "^2.18.1",
     "node-fetch": "^2.6.0",
     "pg": "^7.18.2",

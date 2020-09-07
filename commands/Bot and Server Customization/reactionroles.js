@@ -1,4 +1,3 @@
-
 module.exports = {
 	help: ()=> "Sets, views, or edits reaction roles for the server",
 	usage: ()=> [" - Views available reaction role configs",

@@ -1,6 +1,5 @@
 const Eris 		= require("eris-additions")(require("eris"));
 const Discord   = require("discord.js");
-const dblite 	= require("dblite");
 const fs 		= require("fs");
 const path 		= require("path");	
 
@@ -356,6 +355,7 @@ bot.on("ready",()=>{
 })
 
 setup().then(()=> {
+	console.log('set up');
 	bot.connect();
 }).catch(e => {
 	console.log(e);
