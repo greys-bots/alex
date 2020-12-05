@@ -4,15 +4,15 @@
   "description": "A simple bot to help PluralHub",
   "main": "bot.js",
   "dependencies": {
-    "dblite": "^1.1.3",
-    "discord.js": "^12.2.0",
+    "dblite": "^1.1.4",
+    "discord.js": "^12.5.1",
     "dotenv": "^7.0.0",
     "eris": "github:abalabahaha/eris#dev",
     "eris-additions": "^1.4.1",
     "mysql": "^2.18.1",
-    "node-fetch": "^2.6.0",
-    "pg": "^7.18.2",
-    "tinycolor2": "^1.4.1"
+    "node-fetch": "^2.6.1",
+    "pg": "^8.5.1",
+    "tinycolor2": "^1.4.2"
   },
   "scripts": {
     "start": "supervisor -e .js,.json -i data.sqlite,data.sqlite-journal bot.js"

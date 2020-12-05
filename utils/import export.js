@@ -1,49 +1,50 @@
 module.exports = {
 	getExportData: async (bot, server) => {
 		return new Promise(async res => {
-			var config = await bot.utils.getConfig(bot, server);
-			var servers = await bot.utils.getServers(bot, server);
-			var serverposts = await bot.utils.getAllPosts(bot, server);
-			var reactionroles = await bot.utils.getReactionRoles(bot, server);
-			var reactioncategories = await bot.utils.getReactionCategories(bot, server);
-			var reactionposts = await bot.utils.getReactionRolePosts(bot, server);
-			var starposts = await bot.utils.getStarPosts(bot, server);
-			var banlogs = await bot.utils.getRawBanLogs(bot, server);
-			var receipts = await bot.utils.getReceipts(bot, server);
-			var supportconfig = await bot.utils.getSupportConfig(bot, server);
-			var ticketposts = await bot.utils.getTicketPosts(bot, server);
-			var customcommands = await bot.utils.getCustomCommands(bot, server);
+			var config 				= await bot.stores.configs.get(server);
+			var servers 			= await bot.stores.servers.getAll(server);
+			var posts 				= await bot.stores.serverPosts.getAll(server);
+			var reactionroles 		= await bot.stores.reactRoles.getAll(server);
+			var reactioncategories 	= await bot.stores.reactCategories.getAll(server);
+			var reactionposts 		= await bot.stores.reactPosts.getAll(server);
+			var starposts 			= await bot.stores.starPosts.getAll(server);
+			var banlogs 			= await bot.stores.banLogs.getAll(server);
+			var receipts 			= await bot.stores.receipts.getAll(server);
+			var ticketconfig 		= await bot.stores.ticketConfigs.get(server);
+			var ticketposts 		= await bot.stores.ticketPosts.getAll(server);
+			var customcommands 		= await bot.stores.customCommands.getAll(server);
 
 			res({
-				config: config,
-				servers: servers,
-				posts: serverposts,
-				reaction_roles: reactionroles,
-				reaction_categories: reactioncategories,
-				reaction_posts: reactionposts,
-				star_posts: starposts,
-				ban_logs: banlogs,
-				receipts: receipts,
-				support_config: supportconfig,
-				ticket_posts: ticketposts,
-				custom_commands: customcommands
+				config,
+				servers,
+				posts,
+				reactionroles,
+				reactioncategories,
+				reactionposts,
+				starposts,
+				banlogs,
+				receipts,
+				ticketconfig,
+				ticketposts,
+				customcommands
 			});
 		})
 	},
 	deleteAllData: async (bot, server) => {
 		return new Promise(async res => {
 			try {
-				await bot.utils.deleteConfig(bot, server);
-				await bot.utils.deleteServers(bot, server);
-				await bot.utils.deleteReactionRoles(bot, server);
-				await bot.utils.deleteReactionCategories(bot, server);
-				await bot.utils.deleteReactionRolePosts(bot, server);
-				await bot.utils.deleteStarPosts(bot, server);
-				await bot.utils.deleteBanLogs(bot, server);
-				await bot.utils.deleteSupportConfig(bot, server);
-				await bot.utils.deleteTicketPosts(bot, server);
-				await bot.utils.deleteSupportTickets(bot, server);
-				await bot.utils.deleteCustomCommands(bot, server);
+				await bot.stores.configs.delete(server);
+				await bot.stores.servers.deleteAll(server);
+				await bot.stores.serverPosts.deleteAll(server);
+				await bot.stores.reactRoles.deleteAll(server);
+				await bot.stores.reactCategories.deleteAll(server);
+				await bot.stores.reactPosts.deleteAll(server);
+				await bot.stores.starPosts.deleteAll(server);
+				await bot.stores.banLogs.deleteAll(server);
+				await bot.stores.receipts.deleteAll(server);
+				await bot.stores.ticketConfigs.delete(server);
+				await bot.stores.ticketPosts.deleteAll(server);
+				await bot.stores.customCommands.deleteAll(server);
 			} catch(e) {
 				console.log(e);
 				return res(false);

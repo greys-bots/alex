@@ -79,7 +79,6 @@ class ReceiptStore extends Collection {
 			}
 
 			if(data.rows && data.rows[0]) {
-				this.set(`${server}-${hid}`, data.rows[0])
 				res(data.rows)
 			} else res(undefined);
 		})
