@@ -5,13 +5,13 @@
   "main": "bot.js",
   "dependencies": {
     "dblite": "^1.1.4",
-    "discord.js": "^12.5.1",
+    "discord.js": "^12.5.3",
     "dotenv": "^7.0.0",
     "eris": "github:abalabahaha/eris#dev",
     "eris-additions": "^1.4.1",
     "mysql": "^2.18.1",
     "node-fetch": "^2.6.1",
-    "pg": "^8.5.1",
+    "pg": "^8.6.0",
     "tinycolor2": "^1.4.2"
   },
   "scripts": {

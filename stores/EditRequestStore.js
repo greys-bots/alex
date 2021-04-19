@@ -174,14 +174,16 @@ class EditRequestStore extends Collection {
 
 	async handleReactions(message, emoji, user) {
 		return new Promise(async (res, rej) => {
-			if(this.bot.user.id == user) return res();
+			if(this.bot.user.id == user.id) return res();
+			if(!message.channel.guild) return;
+			if(!["✅", "❌"].includes(emoji.name)) return res();
 			try {
 				message = await this.bot.getMessage(message.channel.id, message.id);
 				var request = await this.get(message.channel.guild.id, message.channel.id, message.id);
 				if(!request) return res();
-				if(!["✅", "❌"].includes(emoji.name)) return res();
+				
 				var embed = message.embeds[0];
-				var member = await this.bot.utils.fetchUser(this.bot, user);
+				var member = await this.bot.utils.fetchUser(this.bot, user.id);
 				var channel = await this.bot.getDMChannel(request.user_id);
 			} catch(e) {
 				if(!e.message.toLowerCase().includes('unknown message')) console.log(e.message || e);
@@ -237,7 +239,7 @@ class EditRequestStore extends Collection {
 
 						var reason;
 						await message.channel.createMessage("Please enter a denial reason. Type `cancel` to cancel the denial, or `skip` to skip giving a reason");
-						var response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0].content;
+						var response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*3, maxMatches: 1, }))[0].content;
 						if(response == "cancel") {
 							await channel.createMessage("Action cancelled");
 							return res;

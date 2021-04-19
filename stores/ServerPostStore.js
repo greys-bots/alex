@@ -373,25 +373,24 @@ class ServerPostStore extends Collection {
 
 	async handleReactions(message, emoji, user) {
 		return new Promise(async (res, rej) => {
-			if(this.bot.user.id == user) return res();
+			if(this.bot.user.id == user.id) return res();
+			if(!message.channel.guild) return res();
 			if(!["📝", "✏️"].includes(emoji.name)) return res();
 			try {
 				message = await this.bot.getMessage(message.channel.id, message.id);
-				var member = await this.bot.users.find(m => m.id == user);
+				var member = await message.channel.guild.members.find(m => m.id == user.id);
 				if(!member) return rej("Couldn't get user");
 			} catch(e) {
 				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
 				return rej(e.message);
 			}
 
-			if(!message.guild) return res();
-
 			var post = await this.get(message.guild.id, message.id);
 			if(!post) return res();
-			await this.bot.removeMessageReaction(message.channel.id, message.id, emoji.name, user);
+			await this.bot.removeMessageReaction(message.channel.id, message.id, emoji.name, user.id);
 
-			var channel = await this.bot.getDMChannel(user);
-			if(!post.server.contact_id || !post.server.contact_id.includes(user)) {
+			var channel = await this.bot.getDMChannel(user.id);
+			if((!post.server.contact_id || !post.server.contact_id.includes(user.id)) && !member.permissions.has('manageMessages')) {
 				try {
 					await channel.createMessage("You aren't a contact for that server, and thus cannot edit it");
 				} catch(e) {
@@ -425,7 +424,7 @@ class ServerPostStore extends Collection {
 			if(post.server.contact_id) {
 				data.contacts = await this.bot.utils.verifyUsers(this.bot, post.server.contact_id);
 				if(!data.contacts.pass[0]) return rej("Contacts invalid");
-				data.contacts = data.contacts.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n");
+				data.contacts = data.contacts.info.map(u => `${u.mention} (${u.username}#${u.discriminator})`).join("\n");
 			} else data.contacts = "(no contacts provided)";
 
 			var done = false;
@@ -467,32 +466,32 @@ class ServerPostStore extends Collection {
 				});
 
 				try {
-					response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
+					response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*5, maxMatches: 1, }))[0].content.toLowerCase();
 					switch(response) {
 						case "1":
 							await channel.createMessage("Enter the new name. You have 2 minutes to do this");
-							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*5, maxMatches: 1, }))[0].content;
+							response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*5, maxMatches: 1, }))[0].content;
 							data.name = response;
 							break;
 						case "2":
 							await channel.createMessage("Enter the new description. You have 5 minutes to do this");
-							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*5, maxMatches: 1, }))[0].content;
+							response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*5, maxMatches: 1, }))[0].content;
 							data.description = response;
 							break;
 						case "3":
 							await channel.createMessage("Enter the new invite. You have 2 minutes to do this");
-							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*2, maxMatches: 1, }))[0].content;
+							response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*2, maxMatches: 1, }))[0].content;
 							data.invite = response;
 							break;
 						case "4":
 							await channel.createMessage("Enter or attach the new icon. You have 3 minutes to do this");
-							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0];
+							response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*3, maxMatches: 1, }))[0];
 							if(response.attachments && response.attachments[0]) data.pic_url = response.attachments[0].url;
 							else data.pic_url = response.content;
 							break;
 						case "5":
 							await channel.createMessage("Enter the new color. You have 2 minutes to do this");
-							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*2, maxMatches: 1, }))[0].content;
+							response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*2, maxMatches: 1, }))[0].content;
 							var color = this.bot.tc(response.split(" ").join(""));
 							if(!color.isValid()) {
 								await channel.createMessage("That color is invalid! Aborting...");
@@ -502,7 +501,7 @@ class ServerPostStore extends Collection {
 							break;
 						case "6":
 							await channel.createMessage("Enter the new value (true/false). You have 2 minutes to do this");
-							response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*2, maxMatches: 1, }))[0].content;
+							response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*2, maxMatches: 1, }))[0].content;
 							if(response == "true") data.visibility = true;
 							else data.visibility = false;
 							break;
@@ -521,7 +520,7 @@ class ServerPostStore extends Collection {
 				if(loops <= 0) break;
 
 				await channel.createMessage("Would you like to edit something else? (y/n)");
-				response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0].content.toLowerCase();
+				response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*3, maxMatches: 1, }))[0].content.toLowerCase();
 				if(!["y", "yes"].includes(response)) {
 					done = true;
 					break;
@@ -545,7 +544,7 @@ class ServerPostStore extends Collection {
 				}
 			}});
 
-			response = (await channel.awaitMessages(m => m.author.id == user, {time:1000*60*3, maxMatches: 1, }))[0].content.toLowerCase();
+			response = (await channel.awaitMessages(m => m.author.id == user.id, {time:1000*60*3, maxMatches: 1, }))[0].content.toLowerCase();
 			if(!["y", "yes"].includes(response)) return await channel.createMessage("Action cancelled");
 
 			try {
@@ -573,7 +572,7 @@ class ServerPostStore extends Collection {
 				}});
 				["✅", "❌"].forEach(r => msg.addReaction(r));
 				delete data.contacts;
-				await this.bot.stores.editRequests.create(message.guild.id, echannel.id, msg.id, post.server.server_id, user, data);
+				await this.bot.stores.editRequests.create(message.guild.id, echannel.id, msg.id, post.server.server_id, user.id, data);
 				await channel.createMessage("Your edit request has been sent. You'll receive a notification once it has been accepted");
 			} catch(e) {
 				console.log(e);

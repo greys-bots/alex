@@ -9,14 +9,6 @@ class BanLogStore extends Collection {
 	};
 
 	async init() {
-		this.bot.on("messageReactionAdd", (...args) => {
-			try {
-				this.handleReactions(...args, this)
-			} catch(e) {
-				console.log(e);
-			}
-		})
-
 		this.bot.on("messageDelete", async (msg) => {
 			return new Promise(async (res, rej) => {
 				if(msg.channel.type == 1) return;
@@ -30,6 +22,14 @@ class BanLogStore extends Collection {
 					return rej(e.message || e);
 				}
 			})	
+		})
+		
+		this.bot.on("messageReactionAdd", (...args) => {
+			try {
+				this.handleReactions(...args, this)
+			} catch(e) {
+				console.log(e);
+			}
 		})
 	}
 
@@ -328,32 +328,18 @@ class BanLogStore extends Collection {
 
 	async handleReactions(msg, emoji, user) {
 		return new Promise(async res => {
-			if(user == this.bot.user.id) return;
-			try {
-				msg = await this.bot.getMessage(msg.channel.id, msg.id);
-			} catch(e) {
-				if(e.message.contains("Unknown Message")) return;
-				console.log(e);
-				return rej(e.message);
-			}
-
-			if(!msg.channel.guild) return res();
-			
+			if(this.bot.user.id == user.id) return;
+			if(!msg.channel.guild) return;
 			if(!["❓","❔"].includes(emoji.name)) return;
 			var log = await this.getByMessage(msg.channel.guild.id, msg.channel.id, msg.id);
 			if(!log) return res();
 
 			try {
-				await msg.removeReaction(emoji.name, user);
-			} catch(e) {
-				console.log(e);
-				//don't need to stop, technically
-			}
+				msg = await this.bot.getMessage(msg.channel.id, msg.id);
+				await msg.removeReaction(emoji.name, user.id);
+				var ch = await this.bot.getDMChannel(user.id);
+				if(!ch) return rej("Couldn't get user DM channel");
 
-			var ch = await this.bot.getDMChannel(user);
-			if(!ch) return rej("Couldn't get user DM channel");
-
-			try {
 				if(!log.receipt) return ch.createMessage("No receipt has been registered for that ban :(");
 				var users = await this.bot.utils.verifyUsers(this.bot, log.embed.fields[1].value.split("\n"));
 				ch.createMessage({embed: {
@@ -363,11 +349,13 @@ class BanLogStore extends Collection {
 						{name: "Users Banned", value: users.info.map(u => `${u.username}#${u.discriminator} (${u.id})`).concat(users.fail.map(u => `${u} - Member deleted?`)).join("\n")},
 						{name: "Reason", value: log.reason || log.embed.fields[2].value || "(no reason provided)"}
 					]
-				}})	
+				}})
 			} catch(e) {
+				if(e.message.includes("Unknown Message")) return;
 				console.log(e);
 				return rej(e.message);
 			}
+
 			res();
 		});
 	}

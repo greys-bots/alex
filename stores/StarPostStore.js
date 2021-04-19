@@ -232,14 +232,14 @@ class StarPostStore extends Collection {
 
 	async handleReactions(msg, emoji, user) {
 		return new Promise(async (res, rej) => {
+			if(!msg.channel.guild) return res();
+			
 			try {
 				msg = await this.bot.getMessage(msg.channel.id, msg.id);
 			} catch(e) {
 				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
 				return rej(e.message);
 			}
-
-			if(!msg.channel.guild) return res();
 
 			emoji = emoji.id ? `:${emoji.name}:${emoji.id}` : emoji.name;
 			var reaction = msg.reactions[emoji.replace(/^:/,"")];
@@ -249,7 +249,7 @@ class StarPostStore extends Collection {
 			var tolerance;
 			if(cfg) tolerance = cfg.starboard || 2;
 			if(board.tolerance) tolerance = board.tolerance;
-			var member = msg.guild.members.find(m => m.id == user);
+			var member = msg.guild.members.find(m => m.id == user.id);
 			if(!member) return rej("Member not found");
 
 			var post = await this.getByOriginal(msg.guild.id, msg.id);
@@ -278,7 +278,7 @@ class StarPostStore extends Collection {
 			if(emoji != "bulk") {
 				//not removeAll reaction event, so we need some extra logic
 				var config = await this.bot.stores.configs.get(msg.channel.guild.id);
-				if(config && config.blacklist && config.blacklist.includes(user)) return;
+				if(config && config.blacklist && config.blacklist.includes(user.id)) return;
 
 				var reaction = emoji.id ? `:${emoji.name}:${emoji.id}` : emoji.name;
 				var count = msg.reactions[reaction.replace(/^:/,"")] ? msg.reactions[reaction.replace(/^:/,"")].count : 0;

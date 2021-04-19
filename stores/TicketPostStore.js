@@ -129,21 +129,15 @@ class TicketPostStore extends Collection {
 	async handleReactions(msg, emoji, user) {
 		return new Promise(async (res, rej) => {
 			if(this.bot.user.id == user.id) return;
-			try {
-				msg = await this.bot.getMessage(msg.channel.id, msg.id);
-			} catch(e) {
-				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
-				return rej(e.message);
-			}
-
-			if(!msg.guild) return res();
-
+			if(!msg.channel.guild) return;
 			var tpost = await this.get(msg.channel.guild.id, msg.id);
 			if(!tpost) return res();
+
 			try {
+				msg = await this.bot.getMessage(msg.channel.id, msg.id);
 				await this.bot.removeMessageReaction(msg.channel.id, msg.id, emoji.name, user.id);
 			} catch(e) {
-				console.log(e);
+				if(!e.message.toLowerCase().includes("unknown message")) console.log(e);
 				return rej(e.message);
 			}
 			
@@ -158,7 +152,7 @@ class TicketPostStore extends Collection {
 				}
 			}
 		
-			var ticket = await this.bot.stores.tickets.create(msg.channel.guild.id, {opener: user.id});
+			var ticket = await this.bot.stores.tickets.create(msg.channel.guild.id, {opener: user});
 			if(!ticket.hid) {
 				try {
 					ch.createMessage("Couldn't open your support ticket:\n"+ticket.e);
