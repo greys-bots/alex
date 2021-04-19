@@ -349,7 +349,7 @@ class ReactPostStore extends Collection {
 			var roles = post.roles.map(r => msg.channel.guild.roles.find(x => x.id == r.role_id)).filter(x => x && x.id != role.role_id);
 			role = msg.channel.guild.roles.find(r => r.id == role.role_id);
 			if(!role) return;
-			var member = msg.channel.guild.members.find(m => m.id == user.id);
+			var member = await msg.channel.guild.getRESTMember(user.id);
 			if(!member) return;
 
 			if(post.category) var category = await this.bot.stores.reactCategories.get(msg.channel.guild.id, post.category);
