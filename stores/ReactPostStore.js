@@ -132,6 +132,7 @@ class ReactPostStore extends Collection {
 			}
 			
 			if(data.rows && data.rows[0]) {
+				var roles = [];
 				for(var role of data.rows[0].roles) {
 					try {
 						var rl = await this.bot.stores.reactRoles.getByRowID(server, role);
@@ -151,7 +152,7 @@ class ReactPostStore extends Collection {
 				}
 
 				data.rows[0].raw_roles = data.rows[0].roles;
-				data.rows[0].roles = posts;
+				data.rows[0].roles = roles;
 				data.rows[0].message = msg;
 				res(data.rows[0])
 			} else res(undefined);
