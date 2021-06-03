@@ -33,5 +33,8 @@ On top of all this, Alex also ships with features like starboards and reaction r
 [our patreon](https://patreon.com/greysdawn)  
 [our ko-fi](https://ko-fi.com/greysdawn)
 
+### Commissions
+We do commissions! If you're interested in a bot or website, check out [this doc](https://docs.google.com/document/d/1hvqvqdWj0mpHeNjo_mr2AHF7La32nkp4BDLxO1dvTHw/edit?usp=drivesdk) for more info!
+
 ## Credit
 Original Python version created by [@xSke](https://github.com/xSke), rewritten in JS and maintained by us
