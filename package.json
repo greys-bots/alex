@@ -1,0 +1,19 @@
+{
+  "name": "alex-rewrite",
+  "version": "1.0.0",
+  "description": "*A heavy lifter bot for hub-style servers*",
+  "main": "bot.js",
+  "dependencies": {
+    "discord.js": "^12.5.3",
+    "dotenv": "^10.0.0",
+    "node-fetch": "^2.6.1",
+    "pg": "^8.6.0",
+    "tinycolor2": "^1.4.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
