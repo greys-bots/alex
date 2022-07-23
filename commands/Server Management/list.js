@@ -14,6 +14,9 @@ module.exports = {
 				var dat = await bot.utils.verifyUsers(bot, servers[i].contact_id);
 				contacts = dat.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n");
 			}
+			var color;
+			if(guild.color) color = parseInt(guild.color, 16);
+			else color = 3447003;
 			
 			embeds.push({embed: {
 				title: (servers[i].name || "(unnamed)") + ` (server ${i+1}/${servers.length})`,
@@ -26,7 +29,7 @@ module.exports = {
 				thumbnail: {
 					url: servers[i].pic_url || ""
 				},
-				color: 3447003,
+				color,
 				footer: {
 					text: `ID: ${servers[i].server_id} | This server ${servers[i].visibility ? "is" : "is not"} visible on the website`
 				}

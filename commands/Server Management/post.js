@@ -8,7 +8,10 @@ module.exports = {
 
 		var dat = guild.contact_id == undefined || guild.contact_id == "" ? "" : await bot.utils.verifyUsers(bot, guild.contact_id);
 		var contacts = dat.info ? dat.info.map(user => `${user.mention} (${user.username}#${user.discriminator})`).join("\n") : "(no contact provided)";
-
+		var color;
+		if(guild.color) color = parseInt(guild.color, 16);
+		else color = 3447003;
+		
 		var failed = [];
 
 		for(var i = 1; i < args.length; i++) {
@@ -31,7 +34,7 @@ module.exports = {
 					thumbnail: {
 						url: guild.pic_url || ""
 					},
-					color: 3447003,
+					color,
 					footer: {
 						text: `ID: ${guild.server_id} | This server ${guild.visibility ? "is" : "is not"} visible on the website`
 					}
